@@ -8,8 +8,8 @@
 ## 快速开始
 
 ```bash
-git clone <本仓库地址>
-cd gods-eye-view
+git clone https://github.com/Verchiel666/gods-eye-view-zh.git
+cd gods-eye-view-zh
 cp .env.example .env        # 可选：所有 Key 均为增强项，零 Key 也能启动
 npm install
 npm run dev -- --host localhost --port 4173
