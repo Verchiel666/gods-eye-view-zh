@@ -1,0 +1,405 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
+
+/**
+ * 汉化补丁（public/zh.js）回归测试。
+ *
+ * 这个 fork 用运行时 DOM 注入做汉化：词典精确匹配 + 正则动态规则 + ' · ' 分段兜底。
+ * 上游一旦重构 UI（改文案、改拼接方式），补丁会静默失效——界面悄悄退回英文，
+ * 没有任何报错。本测试把「覆盖率」变成可执行门槛：
+ *
+ *   - index.html 静态文案必须 100% 覆盖（title / 文本节点 / placeholder / aria-label）
+ *   - 关键动态串规则必须仍能译出
+ *   - 幂等性：译文回写后不得被 MutationObserver 反复改写（否则 DOM 持续抖动）
+ *   - 专有名词（地名、呼号、电台名）必须保留原文
+ *
+ * 同步上游后若本测试变红，说明上游改了文案，需补 public/zh.js 词典。
+ */
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const PATCH_PATH = path.join(REPO_ROOT, 'public/zh.js');
+const HTML_PATH = path.join(REPO_ROOT, 'index.html');
+
+/** 在 vm 沙箱中加载 zh.js，暴露内部 lookup / translateNode 供断言。 */
+function loadPatch() {
+  const source = readFileSync(PATCH_PATH, 'utf8');
+  // 追加测试句柄导出；不修改源文件本身。
+  const instrumented = source.replace(
+    /\n\}\)\(\);\s*$/,
+    "\n  try { globalThis.__GEV_ZH__ = { lookup: lookup, translateNode: translateNode, DICT: DICT }; } catch (e) {}\n})();\n",
+  );
+  assert.notEqual(instrumented, source, 'zh.js 结构变化：未找到 IIFE 结尾，无法注入测试句柄');
+
+  const dialogCalls = { confirm: [], alert: [], prompt: [] };
+  const sandbox = {
+    globalThis: null,
+    window: {
+      confirm: (m) => { dialogCalls.confirm.push(m); return true; },
+      alert: (m) => { dialogCalls.alert.push(m); },
+      prompt: (m, d) => { dialogCalls.prompt.push([m, d]); return ''; },
+    },
+    localStorage: { getItem: () => 'zh', setItem: () => {} },
+    document: {
+      readyState: 'complete',
+      title: '',
+      body: { appendChild() {} },
+      documentElement: { appendChild() {} },
+      createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }),
+      createTreeWalker: () => ({ nextNode: () => null }),
+      addEventListener() {},
+    },
+    MutationObserver: class { observe() {} },
+    NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1 },
+    setInterval: () => 0,
+    location: { reload() {} },
+    WeakSet,
+    console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(instrumented, sandbox, { filename: 'zh.js' });
+
+  const api = sandbox.__GEV_ZH__;
+  assert.ok(api, 'zh.js 未暴露测试句柄');
+  return { lookup: api.lookup, translateNode: api.translateNode, dict: api.DICT, sandbox, dialogCalls };
+}
+
+/* ---------- 最小 DOM 桩：统计写入次数以验证幂等性 ---------- */
+function textNode(data) {
+  const node = {
+    nodeType: 3,
+    writes: 0,
+    _data: data,
+  };
+  Object.defineProperty(node, 'data', {
+    get() { return node._data; },
+    set(v) { node.writes += 1; node._data = v; },
+  });
+  return node;
+}
+
+function element(tagName, attrs = {}) {
+  const store = { ...attrs };
+  return {
+    nodeType: 1,
+    tagName,
+    writes: 0,
+    hasAttribute: (k) => k in store,
+    getAttribute: (k) => (k in store ? store[k] : null),
+    setAttribute(k, v) { this.writes += 1; store[k] = v; },
+  };
+}
+
+/* ---------- HTML 实体解码（还原 DOM 运行时的真实文本） ---------- */
+function decodeEntities(input) {
+  return input
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)));
+}
+
+/** 只保留"值得翻译"的文案：含英文单词、非纯数据、非中文。 */
+function isTranslatable(raw) {
+  const t = raw.replace(/\s+/g, ' ').trim();
+  if (t.length < 2) return false;
+  if (/[一-鿿]/.test(t)) return false;
+  if (!/[A-Za-z]{2}/.test(t)) return false;
+  const words = t.split(/\s+/).filter((w) => /[A-Za-z]/.test(w));
+  return words.length >= 2 || /^[A-Z]{2,}$/.test(t);
+}
+
+/** 提取 index.html 中各类可翻译静态文案（已剔除 script/style/注释）。 */
+function collectHtmlStrings() {
+  const html = readFileSync(HTML_PATH, 'utf8')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  const groups = [
+    { name: 'title', re: /\btitle\s*=\s*"([^"]+)"/g },
+    { name: 'text', re: />([^<>{}]+)</g },
+    { name: 'placeholder', re: /\bplaceholder\s*=\s*"([^"]+)"/g },
+    { name: 'aria-label', re: /\baria-label\s*=\s*"([^"]+)"/g },
+  ];
+
+  return groups.map(({ name, re }) => {
+    const items = new Set();
+    for (const m of html.matchAll(re)) {
+      const t = decodeEntities(m[1]).replace(/\s+/g, ' ').trim();
+      if (isTranslatable(t)) items.add(t);
+    }
+    return { name, items: [...items] };
+  });
+}
+
+test('zh.js 语法有效且可加载', () => {
+  const { dict } = loadPatch();
+  assert.ok(dict && typeof dict === 'object', '词典未加载');
+  const size = Object.keys(dict).length;
+  assert.ok(size >= 400, `词典规模异常缩水：${size} 条（期望 >= 400）`);
+});
+
+test('词典无重复键（重复会让后者静默覆盖前者）', () => {
+  const source = readFileSync(PATCH_PATH, 'utf8');
+  const block = source.slice(
+    source.indexOf('var DICT = {'),
+    source.indexOf('/* ---------- 动态串规则'),
+  );
+  assert.ok(block.length > 0, '未定位到 DICT 区块');
+
+  const keyRe = new RegExp('(["\'])((?:\\\\.|(?!\\1)[^\\\\])*)\\1\\s*:', 'g');
+  const seen = new Set();
+  const duplicates = [];
+  for (const m of block.matchAll(keyRe)) {
+    if (seen.has(m[2])) duplicates.push(m[2]);
+    else seen.add(m[2]);
+  }
+  assert.deepEqual(duplicates, [], `词典存在重复键：${duplicates.join(', ')}`);
+});
+
+test('index.html 静态文案 100% 覆盖（同步上游后的覆盖率门槛）', () => {
+  const { lookup } = loadPatch();
+  const missing = [];
+  let total = 0;
+
+  for (const group of collectHtmlStrings()) {
+    total += group.items.length;
+    for (const text of group.items) {
+      if (lookup(text) === null) missing.push(`[${group.name}] ${JSON.stringify(text)}`);
+    }
+  }
+
+  assert.ok(total > 100, `index.html 静态文案提取异常：仅 ${total} 条`);
+  assert.deepEqual(
+    missing,
+    [],
+    `index.html 有 ${missing.length}/${total} 条静态文案未汉化（上游可能改了文案，需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
+  );
+});
+
+test('关键动态串仍能译出（上游改拼接方式时本测试变红）', () => {
+  const { lookup } = loadPatch();
+  const cases = [
+    // 帧率监视器
+    ['FPS 60', '帧率 60'],
+    ['FPS —', '帧率 —'],
+    // 面板展开/收起
+    ['Expand Radio section', '展开电台分区'],
+    ['Collapse Radio section', '收起电台分区'],
+    // 驾驶舱视觉风格
+    ['Current style: FLIR — click for next', '当前风格: 热成像 — 点击切换下一个'],
+    // 天气开关
+    ['Enable cockpit weather effects', '启用驾驶舱天气效果'],
+    ['Disable cockpit weather effects', '禁用驾驶舱天气效果'],
+    // 场景运行状态
+    ['Loaded: Orbital Watch / Shot 1', '已加载: 轨道监视 / Shot 1'],
+    ['Captured: City Overload / Night Pass', '已抓拍: 城市过载 / Night Pass'],
+    ['Running 2/5: Global Flights Radar / Sweep', '正在播放 2/5: 全球航班雷达 / Sweep'],
+    // 原生弹窗文案
+    ['Delete scene "Orbital Watch" and all shots?', '删除场景「Orbital Watch」及其全部镜头？'],
+    ['Delete shot "Night Pass"?', '删除镜头「Night Pass」？'],
+    ['Shot title', '镜头标题'],
+    // 密钥管理
+    ["Remove GOOGLE MAPS from this app's saved keys", '从本应用已保存的密钥中移除 GOOGLE MAPS'],
+    // 太空任务计数与回放速度
+    ['12 / 30D', '12 / 30 天'],
+    ['2.5×', '2.5 倍'],
+    // 驾驶舱读数
+    ['DEST 045°', '目的 045°'],
+    ['L 030°', '左 030°'],
+    ['R 120°', '右 120°'],
+    ['HDG 045°', '航向 045°'],
+    ['COLL: 12:34:56Z', '采集: 12:34:56Z'],
+    ['ONA: 33.5°', '离天底角: 33.5°'],
+    ['SYNCING ROAD NETWORK 42%', '正在同步路网 42%'],
+    ['CONTACTS · 250 KM', '目标 · 250 公里'],
+    // 错误与加载
+    ['Error: network timeout', '错误: network timeout'],
+    ['LOAD COMPLETE', '加载完成'],
+    ['LOAD FAILED', '加载失败'],
+    ['TURNING OFF LIVE DATA', '正在关闭实时数据'],
+  ];
+
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) failures.push(`${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(failures, [], `动态串规则回归：\n  ${failures.join('\n  ')}`);
+});
+
+test("' · ' 分段翻译：译出已知段，保留专有名词段", () => {
+  const { lookup } = loadPatch();
+  const cases = [
+    ['MILITARY · LIVE · COURSE ALIGNED', '军用 · LIVE · 航向对齐'],
+    ['COMMERCIAL · STANDBY · COURSE ALIGNED', '民航 · STANDBY · 航向对齐'],
+    ['ASCENT PATH · 3.2 km', '上升轨迹 · 3.2 km'],
+    ['LAUNCH SITE · Vandenberg SLC-4E', '发射场 · Vandenberg SLC-4E'],
+    ['SATELLITE SPEED · 7.6 km/s', '卫星速度 · 7.6 km/s'],
+    ['CURRENT DISTANCE FROM EARTH · 412 km', '当前离地距离 · 412 km'],
+    ['Playing BBC World Service · stale directory', '正在播放 BBC World Service · 目录过期'],
+    ['Ready — playback starts only from your action · muted during voice interaction', '就绪 — 仅在你操作后才开始播放 · 语音交互期间静音'],
+    ['GOOGLE NEWS RSS · LOCATION QUERY', 'GOOGLE NEWS RSS · 位置查询'],
+  ];
+
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) failures.push(`${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(failures, [], `分段翻译回归：\n  ${failures.join('\n  ')}`);
+});
+
+test('专有名词、数据、代码串必须保留原文（防误译）', () => {
+  const { lookup } = loadPatch();
+  const keep = [
+    'Alcatraz Island',      // 地名
+    'Burj Khalifa',          // 地名
+    'Vandenberg SLC-4E',     // 发射场
+    'BBC World Service',     // 电台名
+    'CA1234',                // 航班号
+    'https://www.openstreetmap.org/copyright',
+    '.panel-title, .pp-header-label',  // CSS 选择器
+    'icao24',                // 数据字段
+    '42%',
+    '7.6 km/s',
+    '上帝之眼',              // 已是中文（防回环）
+  ];
+
+  const failures = keep.filter((t) => lookup(t) !== null);
+  assert.deepEqual(failures, [], `以下内容被误译：${failures.map((f) => JSON.stringify(f)).join(', ')}`);
+});
+
+test('幂等性：译文回写后不得被反复改写（防 MutationObserver 抖动）', () => {
+  const { translateNode } = loadPatch();
+  // 这些译文自身仍含 ' · '，是最容易触发回环的场景
+  const inputs = [
+    'MILITARY · LIVE · COURSE ALIGNED',
+    'ASCENT PATH · 3.2 km',
+    'LAUNCH SITE · Vandenberg SLC-4E',
+    'Ready — playback starts only from your action · muted during voice interaction',
+    'Playing BBC World Service · stale directory',
+  ];
+
+  for (const input of inputs) {
+    const node = textNode(input);
+    // 模拟 observer 回环 + 周期补扫：连扫 5 轮
+    for (let round = 0; round < 5; round += 1) translateNode(node);
+    assert.equal(
+      node.writes,
+      1,
+      `${JSON.stringify(input)} 被写入 ${node.writes} 次（应为 1）；结果=${JSON.stringify(node.data)}`,
+    );
+  }
+
+  // 已含中文的复合串必须零写入
+  const settled = textNode('军用 · LIVE · 航向对齐');
+  for (let round = 0; round < 5; round += 1) translateNode(settled);
+  assert.equal(settled.writes, 0, '已翻译内容被重复写入');
+  assert.equal(settled.data, '军用 · LIVE · 航向对齐');
+});
+
+test('高频动态串压力：200 轮重扫只应写入节点数次', () => {
+  const { translateNode } = loadPatch();
+  const nodes = ['FPS 60', 'SYNCING ROAD NETWORK 42%', 'CONTACTS · 250 KM', 'HDG 045°'].map(textNode);
+  for (let round = 0; round < 200; round += 1) {
+    for (const node of nodes) translateNode(node);
+  }
+  const totalWrites = nodes.reduce((sum, n) => sum + n.writes, 0);
+  assert.equal(totalWrites, nodes.length, `200 轮重扫产生 ${totalWrites} 次写入（应为 ${nodes.length}）`);
+});
+
+test('属性翻译：title / aria-label / alt / placeholder 各写入一次', () => {
+  const { translateNode } = loadPatch();
+  const el = element('BUTTON', {
+    title: 'Current style: NORMAL — click for next',
+    'aria-label': 'Next cockpit vision style',
+    alt: 'CCTV feed frame',
+    placeholder: 'Search any location...',
+  });
+  for (let round = 0; round < 4; round += 1) translateNode(el);
+
+  assert.equal(el.getAttribute('title'), '当前风格: 标准 — 点击切换下一个');
+  assert.equal(el.getAttribute('aria-label'), '下一个驾驶舱视觉风格');
+  assert.equal(el.getAttribute('alt'), '公共监控画面帧');
+  assert.equal(el.getAttribute('placeholder'), '搜索任意地点...');
+  assert.equal(el.writes, 4, `属性被写入 ${el.writes} 次（应为 4，每属性一次）`);
+});
+
+test('SKIP_TAGS 与 data-gev-zh 标记的节点被跳过', () => {
+  const { translateNode } = loadPatch();
+  for (const tag of ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT', 'CANVAS', 'SVG']) {
+    const el = element(tag, { title: 'READY' });
+    translateNode(el);
+    assert.equal(el.getAttribute('title'), 'READY', `${tag} 不应被翻译`);
+    assert.equal(el.writes, 0, `${tag} 发生写入`);
+  }
+
+  const marked = element('DIV', { 'data-gev-zh': '1', title: 'READY' });
+  translateNode(marked);
+  assert.equal(marked.getAttribute('title'), 'READY', 'data-gev-zh 节点不应被翻译');
+  assert.equal(marked.writes, 0);
+});
+
+test('原生弹窗 hook：confirm / prompt / alert 文案被汉化', () => {
+  const { sandbox, dialogCalls } = loadPatch();
+  // boot() 在 readyState=complete 时同步执行 hookDialogs
+  assert.equal(typeof sandbox.window.confirm, 'function');
+
+  sandbox.window.confirm('Delete scene "Orbital Watch" and all shots?');
+  sandbox.window.prompt('Shot title', 'Night Pass');
+  sandbox.window.alert('Broadcaster stream unavailable');
+
+  assert.equal(dialogCalls.confirm[0], '删除场景「Orbital Watch」及其全部镜头？');
+  assert.deepEqual(dialogCalls.prompt[0], ['镜头标题', 'Night Pass']);
+  assert.equal(dialogCalls.alert[0], '广播流不可用');
+});
+
+test('语言开关：gev-lang=en 时补丁完全不介入', () => {
+  const source = readFileSync(PATCH_PATH, 'utf8');
+  const instrumented = source.replace(
+    /\n\}\)\(\);\s*$/,
+    "\n  try { globalThis.__GEV_ZH_EN__ = true; } catch (e) {}\n})();\n",
+  );
+
+  const dialogCalls = [];
+  const nativeConfirm = () => true;
+  const sandbox = {
+    globalThis: null,
+    window: { confirm: (...a) => { dialogCalls.push(a); return nativeConfirm(); }, alert() {}, prompt: () => '' },
+    localStorage: { getItem: () => 'en', setItem: () => {} },
+    document: {
+      readyState: 'complete',
+      title: 'ORIGINAL',
+      body: { appendChild() {} },
+      documentElement: { appendChild() {} },
+      createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }),
+      createTreeWalker: () => ({ nextNode: () => null }),
+      addEventListener() {},
+    },
+    MutationObserver: class { observe() {} },
+    NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1 },
+    setInterval: () => 0,
+    location: { reload() {} },
+    WeakSet,
+    console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(instrumented, sandbox, { filename: 'zh-en.js' });
+
+  // 提前 return：既不导出句柄，也不改 title，也不 hook 弹窗
+  assert.equal(sandbox.__GEV_ZH_EN__, undefined, 'gev-lang=en 时补丁不应继续执行');
+  assert.equal(sandbox.document.title, 'ORIGINAL', 'gev-lang=en 时不应改写标题');
+  sandbox.window.confirm('Delete scene "X" and all shots?');
+  assert.deepEqual(dialogCalls[0], ['Delete scene "X" and all shots?'], 'gev-lang=en 时不应 hook 弹窗');
+});
