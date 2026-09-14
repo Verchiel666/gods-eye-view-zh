@@ -372,9 +372,11 @@
     [/^Enter a name for the new scene\.?$/, function () { return '为新场景输入名称。'; }],
 
     // 面板展开 / 收起（applicationShell、cockpitLayout、radioBindings、radioControls）
-    [/^(Expand|Collapse) Radio section$/, function (m) { return (m[1] === 'Expand' ? '展开' : '收起') + '电台分区'; }],
-    [/^(Expand|Collapse) (.+)$/, function (m) { var p = trKeep(m[2]); return p ? (m[1] === 'Expand' ? '展开 ' : '收起 ') + p : null; }],
-    [/^(Open|Close) (.+)$/, function (m) { var p = trKeep(m[2]); return p ? (m[1] === 'Open' ? '打开 ' : '关闭 ') + p : null; }],
+    // mixed: 上游会读「已被汉化的面板标题」拼 title（`Expand ${panelName}`），
+    // 因此这些规则必须允许输入含中文，否则界面出现 "Expand 数据图层" 半中半英。
+    [/^(Expand|Collapse) Radio section$/, function (m) { return (m[1] === 'Expand' ? '展开' : '收起') + '电台分区'; }, { mixed: 1 }],
+    [/^(Expand|Collapse) (.+)$/, function (m) { var p = trKeep(m[2]); return p ? (m[1] === 'Expand' ? '展开 ' : '收起 ') + p : null; }, { mixed: 1 }],
+    [/^(Open|Close) (.+)$/, function (m) { var p = trKeep(m[2]); return p ? (m[1] === 'Open' ? '打开 ' : '关闭 ') + p : null; }, { mixed: 1 }],
 
     // 驾驶舱视觉风格 / 天气开关
     [/^Current style: (.+?) — click for next$/, function (m) { return '当前风格: ' + tr(m[1]) + ' — 点击切换下一个'; }],
@@ -450,9 +452,16 @@
     return v === null ? String(s).trim() : v;
   }
 
-  /* 严格翻译：命中则译，未命中返回 null（让整条规则放弃，避免半中半英） */
+  /* 严格翻译：命中则译，未命中返回 null（让整条规则放弃，避免半中半英）。
+   * 例外：输入已含中文时原样采用——上游会读取「已被本补丁汉化的面板标题」
+   * 去拼 title（如 `Expand ${panelName}`，panelName 已是「数据图层」），
+   * 这种情况直接拼上即可，不能因为查不到词典就整条放弃。 */
   function trKeep(s) {
-    return lookup(s);
+    var v = lookup(s);
+    if (v !== null) return v;
+    var raw = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    if (/[一-鿿]/.test(raw)) return raw;
+    return null;
   }
 
   /* ---------- 分段翻译：' · ' 复合串逐段查词典后拼回 ---------- */
@@ -475,23 +484,37 @@
     return out.join(SEP);
   }
 
-  function lookup(raw) {
-    var t = String(raw).replace(/\s+/g, ' ').trim();
-    if (!t || t.length < 2) return null;
-    if (/[一-鿿]/.test(t)) return null;           // 已含中文，跳过（防回环）
-    var d = dictOnly(t);                          // 词典直查（内部已做字母校验）
-    if (d) return d;
-    // RULES 不受"必须含 2 个连续字母"限制：
-    // 覆盖 `12 / 30D`、`L 030°`、`2.5×`、`FPS 60` 等以数据为主的动态串
-    // 规则返回 null 表示"主动放弃"（如后半段译不出），继续尝试后续规则与分段兜底
+  /* 跑规则表。mixedOnly=true 时只允许标记 { mixed: 1 } 的规则——
+   * 用于「输入已含中文」的窄通道（上游用已汉化标题拼串），
+   * 其余规则一律不碰，避免译文被反复改写。 */
+  function runRules(t, mixedOnly) {
     for (var i = 0; i < RULES.length; i++) {
+      if (mixedOnly && !(RULES[i][2] && RULES[i][2].mixed)) continue;
       var m = t.match(RULES[i][0]);
       if (!m) continue;
+      // 规则返回 null 表示「主动放弃」（如后半段译不出），继续尝试后续规则
       try {
         var r = RULES[i][1](m);
         if (r !== null && r !== undefined) return r;
       } catch (e) { /* 单条规则出错不影响其余 */ }
     }
+    return null;
+  }
+
+  function lookup(raw) {
+    var t = String(raw).replace(/\s+/g, ' ').trim();
+    if (!t || t.length < 2) return null;
+    if (/[一-鿿]/.test(t)) {
+      // 已含中文 → 防回环：默认整串跳过。
+      // 唯一例外是 mixed 规则（上游把已汉化的面板标题拼进 title 的场景）。
+      return runRules(t, true);
+    }
+    var d = dictOnly(t);                          // 词典直查（内部已做字母校验）
+    if (d) return d;
+    // RULES 不受"必须含 2 个连续字母"限制：
+    // 覆盖 `12 / 30D`、`L 030°`、`2.5×`、`FPS 60` 等以数据为主的动态串
+    var r = runRules(t, false);
+    if (r !== null) return r;
     // 兜底：' · ' 复合串分段翻译（要求至少有一段是英文单词，避免误译纯数据）
     if (!/[A-Za-z]{2,}/.test(t)) return null;
     return translateSegments(t);

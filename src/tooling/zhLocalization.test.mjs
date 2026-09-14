@@ -259,6 +259,33 @@ test("' · ' 分段翻译：译出已知段，保留专有名词段", () => {
   assert.deepEqual(failures, [], `分段翻译回归：\n  ${failures.join('\n  ')}`);
 });
 
+test("上游用已汉化标题拼串：'Expand 数据图层' 不得半中半英", () => {
+  const { lookup } = loadPatch();
+  // applicationShell.js 读取面板标题（已被本补丁汉化为中文）拼 title：
+  // `btn.title = `${action} ${panelName}`` → "Expand 数据图层"。
+  // 防回环守卫默认会跳过含中文的串，导致悬停提示半中半英——
+  // 必须靠 mixed 规则窄通道修复。这是每次都会发生的场景，不是边缘情况。
+  const cases = [
+    ['Expand 数据图层', '展开 数据图层'],
+    ['Collapse 数据图层', '收起 数据图层'],
+    ['Expand 定位', '展开 定位'],
+    ['Collapse 电台', '收起 电台'],
+    // 纯英文面板名仍正常
+    ['Expand DATA LAYERS', '展开 数据图层'],
+    // 译不出后半段时整条放弃（不产出半中半英）
+    ['Expand detailed Radio controls', null],
+    // 防回环未破：已译内容不得被改写
+    ['军用 · LIVE · 航向对齐', null],
+    ['帧率 60', null],
+  ];
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) failures.push(`${JSON.stringify(input)} 期望 ${JSON.stringify(expected)} 实际 ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(failures, [], `混合串回归：\n  ${failures.join('\n  ')}`);
+});
+
 test('专有名词、数据、代码串必须保留原文（防误译）', () => {
   const { lookup } = loadPatch();
   const keep = [
