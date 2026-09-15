@@ -2,6 +2,33 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.2.0 — 2026-09-15
+
+同步上游 69 个提交（含手绘标注 `feat(annotations)` #547、无密钥导航 #564、Open Calgary 摄像头包 #514、UI 组件化模板拆分等）后，对汉化补丁做的一轮修复。**重点不是补词典，而是修两个会让汉化静默失效的结构性问题。**
+
+### 修复
+
+- **Material Symbols 图标连字被误译（既有 bug，本次根治）** — 图标 `<span class="material-symbols-outlined">radio</span>` 里的文本是字体连字码点，不是文案。而 `radio`/`adjust`/`on`/`normal` 等连字名恰好都是常用英文词，词典里早有词条（`电台`/`调节`/`开`/`标准`），于是 MutationObserver 会把图标译成汉字，连字不成立 → 图标退化成方块或一串字。上游还会在 JS 里动态换图标（`cockpitLayout` 切 `chevron_left/right`、`celestialRing` 建 `light_mode/dark_mode`），`characterData` 变更同样被观测到。
+  - 现在 `translateNode` 在文本节点这层就拦截：父元素 `className`/`classList` 命中 `material-symbols` 即整段跳过，图标容器自身的属性翻译也一并跳过。
+  - **只靠"别往词典加图标名"防不住**——上游随时可能加新图标名，而图标名与常用词撞车是必然的。必须在 DOM 层按容器类型拦。
+  - 新增回归测试 `Material Symbols 图标连字不得被翻译`：17 个真实连字 × 4 种容器 class 全部断言零写入，同时反向确认 `Draw` 这类普通按钮文案在 `class="pp-label"` 下仍正常翻译（防止保护过宽）。
+
+- **静态文案覆盖率门槛失效** — 上游把 `index.html` 从 929 行瘦成 40 行的壳，真实标记拆进 `src/ui/templates/*.html`，由 `build/application-html.js` 的 `expandApplicationHtml()` 在 Vite `transformIndexHtml` 阶段展开 `<!-- gev:template X -->` 占位符。原测试直接解析 `index.html`，结果只能提取到 1 条文案，门槛形同虚设（会假绿）。
+  - 测试改为复用上游同一个 `expandApplicationHtml()`（与 `src/*.test.mjs` 同款相对路径 import），测的才是浏览器真正渲染出来的标记。上游今后再加模板会自动纳入门槛。
+  - 提取范围放宽到单词标签（`Draw`/`Shape`/`Clear`/`Snow`），并剔除图标 span、含 `.`/`_` 的标识符（数据源名如 `adsb.lol` 不译）。门槛从 295 条提升到 **317 条**。
+
+### 新增
+
+- **手绘标注（PR #547）** — `Draw`(手绘)、`Shape`(形状)、`Area`/`Line`/`Pin`(区域/线条/图钉)、颜色 `Primary`/`Amber`/`Cyan`/`Green`/`Red`、`Clear`(清除)，及绘制提示与 `aria-label` 长句。
+- **驾驶舱气象简报** — `regionalModel.js` 的 `weatherCodeLabel()` 全大写状态词此前完全未译：`CLEAR`(晴)、`PARTLY CLOUDY`、`OVERCAST`、`FOG`、`DRIZZLE`、`RAIN`、`SNOW`、`RAIN SHOWERS`、`SNOW SHOWERS`、`THUNDERSTORM`、`MIXED CONDITIONS`、`CONDITIONS UNKNOWN`。
+  - **大小写歧义处理**：手绘面板有 `Clear`(清除按钮) 和 `Snow`(视觉风格"雪白"，不是天气"雪")，气象简报有 `CLEAR`(晴) 和 `SNOW`(雪)。`dictOnly` 精确匹配优先于大小写兜底，故两套词条共存不冲突；图标保护又在 DOM 层兜住小写连字。
+- **`📍 Location: --`** — LOCATION 折叠态空态读数。带 emoji 前缀走不到既有 `Location: (.+)` 规则，单列词条；非空态填城市名属专有名词，保留原文。
+- 词典从 462 条扩充到 **496 条**，动态串规则 50 条。
+
+### 验证
+
+- 汉化门槛测试 14 例全绿；完整测试套件 **3601 / 3592 通过 / 0 失败 / 9 跳过**（其中 2 个是 Node 24 预算基准，与汉化无关）；`npm run build` 通过，`dist/index.html` 58.83 kB（模板已正确展开）、`dist/zh.js` 保留；`check:boundaries` 通过。
+
 ## zh-1.1.0 — 2026-09-14
 
 同步上游 255 个提交（含 `src/ui/` 组件化大重构、太空任务回放、电台生命周期状态机等）后，对汉化补丁做的一轮补全。词典从 170+ 条扩充到 **462 条**，`index.html` 静态文案覆盖率 **100%**（title / 静态文本 / placeholder / aria-label 全部覆盖）。

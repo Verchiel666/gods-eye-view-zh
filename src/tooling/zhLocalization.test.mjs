@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { expandApplicationHtml } from '../../build/application-html.js';
 
 /**
  * 汉化补丁（public/zh.js）回归测试。
@@ -12,12 +13,20 @@ import vm from 'node:vm';
  * 上游一旦重构 UI（改文案、改拼接方式），补丁会静默失效——界面悄悄退回英文，
  * 没有任何报错。本测试把「覆盖率」变成可执行门槛：
  *
- *   - index.html 静态文案必须 100% 覆盖（title / 文本节点 / placeholder / aria-label）
+ *   - 静态文案必须 100% 覆盖（title / 文本节点 / placeholder / aria-label）
  *   - 关键动态串规则必须仍能译出
  *   - 幂等性：译文回写后不得被 MutationObserver 反复改写（否则 DOM 持续抖动）
  *   - 专有名词（地名、呼号、电台名）必须保留原文
  *
  * 同步上游后若本测试变红，说明上游改了文案，需补 public/zh.js 词典。
+ *
+ * ⚠ 「静态文案」的来源（2026-09-15 上游重构后）：
+ * 上游已把 index.html 瘦成壳（约 40 行），真实标记拆进 src/ui/templates/*.html，
+ * 由 build/application-html.js 的 expandApplicationHtml() 在 Vite
+ * transformIndexHtml 阶段展开 `<!-- gev:template X -->` 占位符。
+ * 本测试因此直接复用上游那个展开函数（与 src/*.test.mjs 同款相对路径写法），
+ * 测的才是浏览器真正渲染出来的标记——上游再加模板会自动纳入门槛，
+ * 不会因「index.html 里找不到文案」而假绿。
  */
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -69,10 +78,11 @@ function loadPatch() {
 }
 
 /* ---------- 最小 DOM 桩：统计写入次数以验证幂等性 ---------- */
-function textNode(data) {
+function textNode(data, parentNode = null) {
   const node = {
     nodeType: 3,
     writes: 0,
+    parentNode,
     _data: data,
   };
   Object.defineProperty(node, 'data', {
@@ -84,14 +94,20 @@ function textNode(data) {
 
 function element(tagName, attrs = {}) {
   const store = { ...attrs };
-  return {
+  const el = {
     nodeType: 1,
     tagName,
     writes: 0,
+    // className / classList 是补丁识别 Material Symbols 图标容器的依据
+    className: attrs.class || '',
     hasAttribute: (k) => k in store,
     getAttribute: (k) => (k in store ? store[k] : null),
     setAttribute(k, v) { this.writes += 1; store[k] = v; },
   };
+  el.classList = {
+    contains: (c) => (el.className || '').split(/\s+/).includes(c),
+  };
+  return el;
 }
 
 /* ---------- HTML 实体解码（还原 DOM 运行时的真实文本） ---------- */
@@ -107,22 +123,43 @@ function decodeEntities(input) {
     .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)));
 }
 
-/** 只保留"值得翻译"的文案：含英文单词、非纯数据、非中文。 */
+/**
+ * 只保留"值得翻译"的文案：含英文单词、非纯数据、非中文。
+ *
+ * 单词标签（Draw / Shape / Clear / Snow）同样必须覆盖——它们是按钮上的可见文案，
+ * 漏译就是界面上明晃晃的英文。排除项：
+ *   - 含 `.` 或 `_` 的标识符/域名（adsb.lol、feeds_osm 等数据源名，不译）
+ *   - 纯数据（需含 2 个以上连续字母）
+ */
 function isTranslatable(raw) {
   const t = raw.replace(/\s+/g, ' ').trim();
   if (t.length < 2) return false;
   if (/[一-鿿]/.test(t)) return false;
   if (!/[A-Za-z]{2}/.test(t)) return false;
-  const words = t.split(/\s+/).filter((w) => /[A-Za-z]/.test(w));
-  return words.length >= 2 || /^[A-Z]{2,}$/.test(t);
+  if (/[._]/.test(t)) return false;
+  return true;
 }
 
-/** 提取 index.html 中各类可翻译静态文案（已剔除 script/style/注释）。 */
+/**
+ * 提取浏览器实际渲染出来的可翻译静态文案。
+ *
+ * 上游已把 index.html 瘦成壳，真实标记在 src/ui/templates/*.html，
+ * 由 expandApplicationHtml() 在构建期展开 `<!-- gev:template X -->` 占位符。
+ * 这里复用同一个函数，确保测的是运行时标记，而不是壳。
+ *
+ * 两个必须剔除的假阳性：
+ *   - script/style/注释（不参与渲染）
+ *   - Material Symbols 图标连字（<span class="... material-symbols-outlined">draw</span>）：
+ *     那是字体连字码点，译了就渲染成方框，绝不能进词典/门槛
+ */
 function collectHtmlStrings() {
-  const html = readFileSync(HTML_PATH, 'utf8')
+  const expanded = expandApplicationHtml(readFileSync(HTML_PATH, 'utf8'));
+  const html = expanded
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '');
+    .replace(/<!--[\s\S]*?-->/g, '')
+    // 先整体抹掉图标 span（含其文本连字），再提文案
+    .replace(/<span[^>]*material-symbols-outlined[^>]*>[\s\S]*?<\/span>/gi, '');
 
   const groups = [
     { name: 'title', re: /\btitle\s*=\s*"([^"]+)"/g },
@@ -131,14 +168,20 @@ function collectHtmlStrings() {
     { name: 'aria-label', re: /\baria-label\s*=\s*"([^"]+)"/g },
   ];
 
-  return groups.map(({ name, re }) => {
+  const out = [];
+  const seen = new Set();
+  for (const { name, re } of groups) {
     const items = new Set();
     for (const m of html.matchAll(re)) {
       const t = decodeEntities(m[1]).replace(/\s+/g, ' ').trim();
-      if (isTranslatable(t)) items.add(t);
+      if (isTranslatable(t) && !seen.has(t)) {
+        seen.add(t);
+        items.add(t);
+      }
     }
-    return { name, items: [...items] };
-  });
+    out.push({ name, items: [...items] });
+  }
+  return out;
 }
 
 test('zh.js 语法有效且可加载', () => {
@@ -166,7 +209,7 @@ test('词典无重复键（重复会让后者静默覆盖前者）', () => {
   assert.deepEqual(duplicates, [], `词典存在重复键：${duplicates.join(', ')}`);
 });
 
-test('index.html 静态文案 100% 覆盖（同步上游后的覆盖率门槛）', () => {
+test('静态文案 100% 覆盖（同步上游后的覆盖率门槛）', () => {
   const { lookup } = loadPatch();
   const missing = [];
   let total = 0;
@@ -178,11 +221,16 @@ test('index.html 静态文案 100% 覆盖（同步上游后的覆盖率门槛）
     }
   }
 
-  assert.ok(total > 100, `index.html 静态文案提取异常：仅 ${total} 条`);
+  assert.ok(
+    total > 100,
+    `静态文案提取异常：仅 ${total} 条。`
+      + '上游可能又改了标记来源（index.html 现为壳，真实文案在 src/ui/templates/*.html，'
+      + '经 build/application-html.js 的 expandApplicationHtml 展开），请同步更新 collectHtmlStrings()',
+  );
   assert.deepEqual(
     missing,
     [],
-    `index.html 有 ${missing.length}/${total} 条静态文案未汉化（上游可能改了文案，需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
+    `有 ${missing.length}/${total} 条静态文案未汉化（上游可能改了文案，需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
   );
 });
 
@@ -375,6 +423,43 @@ test('SKIP_TAGS 与 data-gev-zh 标记的节点被跳过', () => {
   translateNode(marked);
   assert.equal(marked.getAttribute('title'), 'READY', 'data-gev-zh 节点不应被翻译');
   assert.equal(marked.writes, 0);
+});
+
+test('Material Symbols 图标连字不得被翻译（译了图标就退化成方块/汉字）', () => {
+  const { translateNode, lookup } = loadPatch();
+
+  // 这些值既是图标连字、又是常用英文词，是最容易踩中的组合。
+  // 词典里 radio/adjust/on/normal 都有词条（'电台'/'调节'/'开'/'标准'），
+  // draw 也是本 fork 新加的（'手绘'），必须全部拦住。
+  const ligatures = [
+    'radio', 'adjust', 'on', 'normal', 'draw', 'public', 'close',
+    'flight', 'navigation', 'east', 'radar', 'bolt', 'flare',
+    'light_mode', 'dark_mode', 'chevron_left', 'right_panel_open',
+  ];
+
+  for (const cls of ['material-symbols-outlined', 'pp-icon material-symbols-outlined',
+    'cockpit-heading-caret material-symbols-outlined',
+    'celestial-marker celestial-sun material-symbols-outlined']) {
+    const iconEl = element('SPAN', { class: cls });
+    for (const name of ligatures) {
+      const t = textNode(name, iconEl);
+      translateNode(t);
+      assert.equal(t.writes, 0, `图标连字 ${JSON.stringify(name)} 在 class="${cls}" 内被改写了`);
+      assert.equal(t.data, name, `图标连字 ${JSON.stringify(name)} 内容变了`);
+    }
+    // 图标元素自身的属性也不该被翻译（连字容器上没有可见文案）
+    translateNode(iconEl);
+    assert.equal(iconEl.writes, 0, `图标容器 class="${cls}" 发生写入`);
+  }
+
+  // 反向确认：同一批词在【非图标】上下文里必须照常翻译，
+  // 否则说明保护过宽、把正常文案也一起拦掉了
+  const btn = element('SPAN', { class: 'pp-label' });
+  const label = textNode('Draw', btn);
+  translateNode(label);
+  assert.equal(label.data, '手绘', '普通按钮文案 Draw 应被翻译（保护不得过宽）');
+
+  assert.equal(lookup('radio'), '电台', '词典本身应仍能译出 radio（是 DOM 层拦的，不是词典删的）');
 });
 
 test('原生弹窗 hook：confirm / prompt / alert 文案被汉化', () => {

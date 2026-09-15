@@ -263,6 +263,30 @@
     'Detection overlay': '探测覆盖层', 'Detection fade distance': '探测衰减距离',
     'Detection label density': '探测标签密度', 'Detection label allocation': '探测标签分配',
     'Detection opacity outside the keyhole': '锁孔外探测不透明度',
+    // 2026-09-15 补：上游把静态文案拆进 src/ui/templates/*.html 后新暴露的单词标签
+    // 词典精确匹配优先于大小写兜底，故 'Clear'(清除按钮) 不会吃掉气象 'CLEAR'(晴)
+    'Sharpening': '锐化中', 'Allocation': '分配', 'All': '全部',
+    'Snow': '雪白', // 视觉风格（cold snowy whiteout），非天气"雪"
+
+    // ===== 手绘标注（PR #547 annotations）=====
+    'Draw': '手绘', 'Shape': '形状', 'Area': '区域', 'Line': '线条', 'Pin': '图钉',
+    'Clear': '清除',
+    'Primary': '主色', 'Amber': '琥珀', 'Cyan': '青色', 'Green': '绿色', 'Red': '红色',
+    'Draw on the world — click vertices, double-click or Enter to finish, Esc to cancel':
+      '在地球上手绘 — 点击放置顶点，双击或按 Enter 完成，Esc 取消',
+    'Remove every mark from the board': '清除图上全部标记',
+    'Label (optional)': '标签（可选）',
+    'Shape to draw': '要绘制的形状',
+    'Label for the drawn shape': '所绘形状的标签',
+    'Colour of the drawn shape': '所绘形状的颜色',
+
+    // ===== 驾驶舱气象简报（src/data/regionalModel.js weatherCodeLabel）=====
+    // 全大写：与手绘面板的 'Clear' / 'Snow' 区分开，二者语义不同
+    'CLEAR': '晴', 'PARTLY CLOUDY': '局部多云', 'OVERCAST': '阴', 'FOG': '雾',
+    'DRIZZLE': '毛毛雨', 'RAIN': '雨', 'SNOW': '雪',
+    'RAIN SHOWERS': '阵雨', 'SNOW SHOWERS': '阵雪',
+    'THUNDERSTORM': '雷暴', 'MIXED CONDITIONS': '混合天气',
+    'CONDITIONS UNKNOWN': '天气未知',
     'World-overlay fade distance outside the keyhole as a percentage of its radius':
       '锁孔外世界覆盖层的衰减距离，按其半径的百分比计',
     'World-overlay label and card opacity beyond the fade distance': '超出衰减距离的世界覆盖层标签与卡片不透明度',
@@ -331,6 +355,10 @@
     'Nearby cohort counts': '周边分组计数',
     'Latest regional news': '最新区域新闻',
     'Location-based information': '基于位置的信息',
+    // command-dock 折叠态 LOCATION 双行读数的空态（src/locationStatus.js EMPTY）。
+    // 带 emoji 前缀走不到下面的 `Location: (.+)` 规则，必须单列；
+    // 非空态填的是城市名（`📍 Tokyo`），属专有名词，保留原文。
+    '📍 Location: --': '📍 位置: --',
     'Show Live Signals': '显示实时信号',
     'Show Regional News': '显示区域新闻',
     'Show Local Info': '显示本地信息',
@@ -541,14 +569,33 @@
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEXTAREA: 1, INPUT: 1, CANVAS: 1, SVG: 1 };
   var done = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
 
+  /* Material Symbols 图标保护。
+     图标 span 的文本内容不是文案，是字体连字码点（<span class="material-symbols-outlined">radio</span>）。
+     一旦被词典译成中文，连字不成立 → 图标退化成方块或一串汉字。
+     危险点在于这些值会和普通英文词撞车：radio(电台)、adjust(调节)、on(开)、normal(标准)、
+     draw(手绘)、public、close、flight、navigation、east 全是常用词。
+     上游还会在 JS 里动态换图标（cockpitLayout 切 chevron_left/right、celestialRing 建 light_mode），
+     MutationObserver 会抓到这些 characterData 变更，所以必须在文本节点这层拦住，
+     只靠"别往词典加图标名"是防不住的——上游随时可能加新图标名。 */
+  function isIconNode(node) {
+    if (!node || node.nodeType !== 1) return false;
+    var cn = node.className;
+    if (typeof cn === 'string' && /material-symbols/.test(cn)) return true;
+    var cl = node.classList;
+    return !!(cl && cl.contains && cl.contains('material-symbols-outlined'));
+  }
+
   function translateNode(node) {
     if (node.nodeType === 3) {
+      // 图标连字：父元素是 Material Symbols 容器就整段跳过
+      if (node.parentNode && isIconNode(node.parentNode)) return;
       var out = lookup(node.data);
       if (out !== null && out !== node.data) node.data = out;
       return;
     }
     if (node.nodeType !== 1) return;
     if (SKIP_TAGS[node.tagName]) return;
+    if (isIconNode(node)) return;
     if (node.hasAttribute && node.hasAttribute('data-gev-zh')) return;
     ['placeholder', 'title', 'aria-label', 'alt'].forEach(function (attr) {
       var v = node.getAttribute && node.getAttribute(attr);
