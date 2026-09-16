@@ -2,6 +2,25 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.2.1 — 2026-09-16
+
+同步上游 62 个提交（Director 场景数据包与镜头指令 #610–#613、实时公交 GTFS-Realtime #587、尼泊尔洪水场景 #590、语音 Realtime 状态归属重构、transit/voice 若干修复）后的一轮汉化补全。上游无冲突，汉化补丁文件独立。
+
+### 新增
+
+- **地图朝向 / 倾斜控制按钮**（上游新增 `src/ui/templates/scene-chrome.html` 的 `#tilt-map-view`、`#north-up-view`）— 覆盖率门槛测试直接报出 4/320 条未汉化：
+  - `Toggle straight-down and tilted map views`(切换正俯视与倾斜地图视角)、`Reset map bearing to north`(将地图朝向重置为正北)、`Tilt map to oblique view`(将地图倾斜为斜视角)、`Reset map to north up`(重置地图为上北朝向)。
+  - 另补 `Return map to straight-down view`(恢复地图为正俯视视角) — 这是 `src/ui/cameraOrientationControls.js` 在倾斜态运行时改写的 `aria-label`，静态门槛扫不到，但漏了界面会切态后退回英文。
+- **动态航向读数规则** — 上游每帧把北向按钮的 `aria-label` 改写成 `` `Reset map to north up. Current heading ${heading} degrees` ``，新增规则译出「重置地图为上北朝向。当前航向 N 度」。属性在 MutationObserver 的 `attributeFilter` 内，会被正常抓到。
+- 词典从 496 条扩充到 **501 条**，动态串规则 50 → **51 条**。
+
+### 验证
+
+- 汉化门槛测试 **14/14 全绿**，静态文案覆盖 **320/320 = 100%**。
+- 图标连字安全复查：本次上游新增 3 个 Material Symbols 连字 `view_in_ar`、`navigation`、`public`，均未被词典命中；`navigation`/`public` 已在既有 DOM 容器拦截测试的连字清单内（保护不靠黑名单）。
+- 完整测试套件 **4149 / 4139 通过 / 0 失败 / 10 跳过**；`npm run build` 通过；`check:boundaries` 通过（上游本轮把它扩成 `check-import-directions.mjs` + `check-package-boundaries.mjs` 两步）。
+- 依赖未漂移：`package.json` 仅扩充 `exports` 子路径映射与 `scripts`，`package-lock.json` 无变更，**无需 `npm install`**。
+
 ## zh-1.2.0 — 2026-09-15
 
 同步上游 69 个提交（含手绘标注 `feat(annotations)` #547、无密钥导航 #564、Open Calgary 摄像头包 #514、UI 组件化模板拆分等）后，对汉化补丁做的一轮修复。**重点不是补词典，而是修两个会让汉化静默失效的结构性问题。**

@@ -385,7 +385,16 @@
     'Next filtered radio station': '下一个筛选电台',
     'Next filtered station': '下一个筛选电台',
     'Expand Visual Presets': '展开视觉预设',
-    'Current cockpit vision style: NORMAL. Activate for next style.': '当前驾驶舱视觉风格: 标准。激活以切换下一个风格。'
+    'Current cockpit vision style: NORMAL. Activate for next style.': '当前驾驶舱视觉风格: 标准。激活以切换下一个风格。',
+
+    // ===== 补充：地图朝向 / 倾斜控制（src/ui/templates/scene-chrome.html
+    // 的 #tilt-map-view、#north-up-view 两个按钮）。静态 title / aria-label 在此，
+    // 运行时由 src/ui/cameraOrientationControls.js 改写的 aria-label 见下方 RULES。
+    'Toggle straight-down and tilted map views': '切换正俯视与倾斜地图视角',
+    'Reset map bearing to north': '将地图朝向重置为正北',
+    'Tilt map to oblique view': '将地图倾斜为斜视角',
+    'Reset map to north up': '重置地图为上北朝向',
+    'Return map to straight-down view': '恢复地图为正俯视视角'
   };
 
   /* ---------- 动态串规则（正则 → 译文函数），更具体的放前面 ---------- */
@@ -410,6 +419,10 @@
     [/^Current style: (.+?) — click for next$/, function (m) { return '当前风格: ' + tr(m[1]) + ' — 点击切换下一个'; }],
     [/^Current cockpit vision style: (.+?)\. Activate for next style\.$/, function (m) { return '当前驾驶舱视觉风格: ' + tr(m[1]) + '。激活以切换下一个风格。'; }],
     [/^(Enable|Disable) cockpit weather effects$/, function (m) { return (m[1] === 'Enable' ? '启用' : '禁用') + '驾驶舱天气效果'; }],
+
+    // 地图朝向按钮：运行时 cameraOrientationControls.js 会把 #north-up-view 的
+    // aria-label 改写成带当前航向角的动态串（每帧 heading 变化都会触发 attributes 观察）
+    [/^Reset map to north up\. Current heading (\d+) degrees$/, function (m) { return '重置地图为上北朝向。当前航向 ' + m[1] + ' 度'; }],
 
     // 电台播放（限定不含 ' · '，复合串交给分段翻译逐段处理）
     [/^Playing ([^·]+)$/, function (m) { return '正在播放 ' + m[1].trim(); }],
