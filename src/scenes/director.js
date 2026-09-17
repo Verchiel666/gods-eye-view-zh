@@ -26,6 +26,13 @@ import {
 } from './recipes.js';
 import { sceneLayerPlan, sceneRequiresContextModeExit } from './scenePolicy.js';
 import { createSceneDataPacks } from './dataPacks/controller.js';
+import { createSceneInteractions } from './interactions.js';
+import { createSceneSharing } from './sharing.js';
+import {
+  createBundleAssets,
+  BUNDLE_SOURCE,
+  readSceneShare,
+} from '../director/sharing/bundle.js';
 import { createDefaultScenePacks } from './packs/defaults.js';
 import {
   layerStatesForShot,
@@ -50,7 +57,6 @@ import {
 import {
   parseSceneDocument,
   stringifySceneDocument,
-  SCENE_DOCUMENT_LIMITS,
   SceneDocumentError,
 } from '../director/document.js';
 
@@ -88,11 +94,32 @@ export class SceneDirector {
     this.dataManager = dataManager;
     this._isMapStackAvailable = isMapStackAvailable;
     this._scenePacks = scenePacks;
-    this._dataPacks = createSceneDataPacks(viewer, dataPacks);
+    this._bundleAssets = createBundleAssets();
+    this._dataPacks = createSceneDataPacks(viewer, {
+      ...dataPacks,
+      sources: {
+        ...dataPacks.sources,
+        [BUNDLE_SOURCE]: this._bundleAssets.source,
+      },
+    });
+    this._sharing = createSceneSharing(this);
+    this._interactionTransitions = 0;
+    this._interactions = createSceneInteractions(viewer, {
+      available: () =>
+        !this._destroyed && !this._running && !this.viewer.trackedEntity,
+      execute: (action, signal) =>
+        this._trackWork(this._executeInteraction(action, signal)),
+    });
     this._cameraMotion = createCameraMotion({
       applyPose: (pose) => this._setCameraView(pose),
     });
-    const yieldCamera = () => {
+    const yieldCamera = (event) => {
+      // A settled feature click belongs to the action picker, not a new camera gesture.
+      if (
+        event?.type === 'pointerdown' &&
+        this._interactions?.getState().active
+      )
+        return;
       if (this._usesAuthoredCamera && !this._claimingCamera)
         this.stopScene('Camera ownership changed');
     };
@@ -203,6 +230,9 @@ export class SceneDirector {
     this._cameraHandoffUnsubscribe?.();
     this._removeCameraInput?.();
     this._cameraMotion?.destroy();
+    this._sharing?.destroy();
+    this._bundleAssets?.clear();
+    this._interactions?.destroy();
     this._dataPacks?.destroy();
     this._controls?.destroy();
     this._state.destroy();
@@ -354,6 +384,7 @@ export class SceneDirector {
    * Exits silently if the scene-select element is missing (headless/test mode).
    */
   _initUI() {
+    this._sharing?.mount();
     this._controls = new SceneControls({
       subscribe: (listener) => this.subscribe(listener),
       read: () => ({
@@ -389,6 +420,7 @@ export class SceneDirector {
         next: () => this.runNextScene(),
         export: () => this.exportProject(),
         import: (file) => this.importProjectFile(file),
+        reviewImport: (file) => this._sharing.preview(file),
         download: () => this.downloadLastRunMetadata(),
         load: (sceneId, shotId) => this.loadShot(sceneId, shotId),
         deleteShot: (sceneId, shotId) => this.deleteShot(sceneId, shotId),
@@ -976,13 +1008,40 @@ export class SceneDirector {
     if (this._destroyed)
       return Promise.resolve({ started: false, reason: 'destroyed' });
     this._sceneSeekGeneration++;
-    return this._trackWork(this._loadShot(sceneId, shotId, options));
+    this._interactionTransitions = 0;
+    const previousGeneration = this._loadGeneration;
+    const work = this._loadShot(sceneId, shotId, options);
+    const generation = this._loadGeneration;
+    const ownsLoad = generation !== previousGeneration;
+    return this._trackWork(
+      work.then(
+        (result) => {
+          if (
+            ownsLoad &&
+            !result?.started &&
+            generation === this._loadGeneration
+          )
+            this._setSceneMediaPlayback();
+          return result;
+        },
+        (error) => {
+          if (ownsLoad && generation === this._loadGeneration)
+            this._setSceneMediaPlayback();
+          throw error;
+        },
+      ),
+    );
   }
 
   async _loadShot(
     sceneId,
     shotId,
-    { flyDuration = null, fromCamera = null, sceneSeek = null } = {},
+    {
+      flyDuration = null,
+      fromCamera = null,
+      sceneSeek = null,
+      playMedia = false,
+    } = {},
   ) {
     if (this._running) return { started: false, reason: 'already-running' };
     const { scene, shot } = this._getShot(sceneId, shotId);
@@ -1001,6 +1060,8 @@ export class SceneDirector {
     // manager) rather than merely ignored once it has already committed.
     this._cancelActiveSceneTravel();
     this._usesAuthoredCamera = !!shot.move;
+    this._setSceneMediaPlayback();
+    this._interactions?.clear();
     this._dataPacks?.clear();
     this._loadAbort?.abort();
     const controller = new AbortController();
@@ -1030,6 +1091,10 @@ export class SceneDirector {
     if (token.cancelled) return;
     const seekState =
       sceneSeek && typeof sceneSeek === 'object' ? sceneSeek : null;
+    // Previous-scene disable revokes media ownership. Grant the target only
+    // after release and visual setup have succeeded for this live LOAD.
+    if (playMedia && !seekState)
+      this._setSceneMediaPlayback(scene, shot, token);
     const layerResult = await this._applyLayerStates(
       this._layerStatesForShot(scene, shot, {
         cameraSettled: seekState ? seekState.cameraProgress >= 1 : false,
@@ -1060,6 +1125,7 @@ export class SceneDirector {
       });
       if (this._loadAbort === controller) this._loadAbort = null;
       this._updateStatus(`Seeked: ${scene.title} / ${shot.title}`);
+      this._activateInteractions(scene, shot);
       return { started: true, shotId };
     }
     const holdSec = this._effectiveShotHoldSec(scene, shot);
@@ -1109,6 +1175,7 @@ export class SceneDirector {
     );
 
     if (this._loadAbort === controller) this._loadAbort = null;
+    this._activateInteractions(scene, shot);
     this._shotOutcome('shot-loaded', scene, shot);
     this._updateRuntime('');
     return { started: true, shotId };
@@ -1121,6 +1188,29 @@ export class SceneDirector {
    */
   _layerStatesForShot(scene, shot, options) {
     return layerStatesForShot(scene, shot, this._scenePacks, options);
+  }
+
+  /** Give opt-in media layers a transient, cancellable shot owner. */
+  _setSceneMediaPlayback(scene = null, shot = null, token = null) {
+    for (const module of this._sceneMediaModules || [])
+      module.setSceneMediaPlayback();
+    this._sceneMediaModules = new Set();
+    if (!scene || !shot || !token || token.cancelled || token.signal?.aborted)
+      return;
+    for (const [id, state] of Object.entries(shot.layers || {})) {
+      const module = this.dataManager?.layers?.get(id)?.module;
+      if (
+        !state?.enabled ||
+        typeof module?.setSceneMediaPlayback !== 'function'
+      )
+        continue;
+      module.setSceneMediaPlayback({
+        sceneId: scene.id,
+        shotId: shot.id,
+        token,
+      });
+      this._sceneMediaModules.add(module);
+    }
   }
 
   /** Keep installed append-pack shots on any surface declared by their source recipe. */
@@ -1278,6 +1368,7 @@ export class SceneDirector {
     const previousShot =
       scene.shots[(shotIndex - 1 + scene.shots.length) % scene.shots.length];
     const result = await this.loadShot(sceneId, shotId, {
+      playMedia: true,
       flyDuration: shot.durationSec || DEFAULT_SHOT_DURATION_SEC,
       fromCamera: shot.move
         ? null
@@ -1359,6 +1450,8 @@ export class SceneDirector {
     if (
       !scene ||
       !shot ||
+      shot.dataPackIds?.length ||
+      shot.interactions?.length ||
       this._loadedSceneId !== scene.id ||
       this._selectedShotId !== shot.id
     )
@@ -1620,7 +1713,9 @@ export class SceneDirector {
     // load cannot land a stale shot's layers on top of the run's first shot.
     // Aborting cancels a layer transition already in flight; bumping the
     // generation disowns everything the load has not yet started.
+    this._setSceneMediaPlayback();
     this._cancelActiveSceneTravel();
+    this._interactions?.clear();
     this._dataPacks?.clear();
     this._loadAbort?.abort();
     this._loadAbort = null;
@@ -1732,6 +1827,8 @@ export class SceneDirector {
    * @param {string} [reason='Stopped'] - Human-readable cancellation reason
    */
   stopScene(reason = 'Stopped') {
+    this._setSceneMediaPlayback();
+    this._interactions?.clear();
     this._dataPacks?.clear();
     this._sceneSeekGeneration++;
     this._loadAbort?.abort();
@@ -1761,6 +1858,79 @@ export class SceneDirector {
   /** Copied resource state for lifecycle checks and diagnostics. */
   getDataPackState() {
     return this._dataPacks?.getState() || { status: 'idle', count: 0 };
+  }
+
+  /** Activate only after LOAD/seek settles. Running timelines never branch automatically. */
+  _activateInteractions(scene, shot) {
+    try {
+      this._interactions?.activate(shot, this._dataPacks.getTargets());
+    } catch (error) {
+      this._updateStatus(error.message);
+    }
+  }
+
+  /** Execute a validated action through the existing camera and layer admission paths. */
+  async _executeInteraction(action, signal) {
+    if (signal.aborted || this._running || this._destroyed) return false;
+    const { scene, shot } = this._getShot(
+      this._selectedSceneId,
+      this._selectedShotId,
+    );
+    if (!scene || !shot) return false;
+    if (action.type === 'focus') {
+      if (!this._claimCameraOwnership()) return false;
+      this._cancelActiveSceneTravel();
+      this._clock.stopShot();
+      return this._setCameraView(
+        resolveCameraPose(scene, { anchorId: action.anchorId, pitch: -90 }),
+      );
+    }
+    if (action.type === 'layer') {
+      if (
+        !this.dataManager.getAll().some((layer) => layer.id === action.layerId)
+      )
+        return false;
+      return this.dataManager.setEnabled(action.layerId, action.enabled, {
+        signal,
+        origin: 'scene',
+      });
+    }
+    if (action.type === 'shot') {
+      if (this._interactionTransitions >= 64) {
+        this._updateStatus(
+          'Scene transition limit reached — load a shot to reset',
+        );
+        return false;
+      }
+      this._interactionTransitions++;
+      // Replacement clears this action's owner; the new LOAD owns its own cancellation.
+      const target = scene.shots.find((item) => item.id === action.shotId);
+      return this.seekScene(
+        scene.id,
+        this._sceneTimingForShot(scene, target).startProgress,
+      );
+    }
+    return false;
+  }
+
+  /** Copied interaction state for lifecycle diagnostics. */
+  getInteractionState() {
+    return (
+      this._interactions?.getState() || {
+        active: false,
+        busy: false,
+        selected: null,
+        count: 0,
+      }
+    );
+  }
+
+  /** Copied authoring and bundled-byte diagnostics for lifecycle checks. */
+  getSharingState() {
+    return {
+      ...this._sharing?.getState(),
+      assets: this._bundleAssets?.getState() || { count: 0, bytes: 0 },
+    };
   }
 
   /** Export the entire project as a timestamped JSON file download. */
@@ -1793,30 +1963,66 @@ export class SceneDirector {
    * The file is normalized/migrated on load; invalid JSON shows an error status.
    * @param {File} file - Browser File object from an <input type="file">
    */
-  async importProjectFile(file) {
+  async importProjectFile(
+    file,
+    { prepared, expectedProject, selection, signal } = {},
+  ) {
     const generation = (this._importGeneration =
       (this._importGeneration || 0) + 1);
     try {
-      if (file.size > SCENE_DOCUMENT_LIMITS.bytes) {
-        throw new SceneDocumentError('$', 'file exceeds 5 MiB');
-      }
-      const text = await file.text();
-      if (this._destroyed || generation !== this._importGeneration) return;
-      const project = normalizeProject(parseSceneDocument(text));
+      if (!prepared) this._sharing?.close();
+      const input = prepared || (await readSceneShare(file, { signal }));
+      if (signal?.aborted) return false;
+      if (this._destroyed || generation !== this._importGeneration)
+        return false;
+      const project = normalizeProject(
+        parseSceneDocument(stringifySceneDocument(input.project)),
+      );
+      if (
+        expectedProject &&
+        expectedProject !== JSON.stringify(this._project, null, 2)
+      )
+        return false;
       // Validate before touching playback, selection or the saved project.
       this.stopScene('Importing project');
       await Promise.allSettled([...(this._pendingWork || [])]);
       if (this._destroyed || generation !== this._importGeneration) return;
+      if (
+        signal?.aborted ||
+        (expectedProject &&
+          expectedProject !== JSON.stringify(this._project, null, 2))
+      )
+        return false;
       this._project = project;
+      const retainedPaths = new Set(
+        project.scenes.flatMap((scene) =>
+          (scene.dataPacks || [])
+            .filter((pack) => pack.source.adapter === BUNDLE_SOURCE)
+            .map((pack) => pack.source.path),
+        ),
+      );
+      this._bundleAssets?.replace(
+        new Map(
+          [...(input.assets || [])].filter(([path]) => retainedPaths.has(path)),
+        ),
+      );
       this._storageReadError = null;
-      this._selectedSceneId = project.scenes[0]?.id || null;
-      this._selectedShotId = project.scenes[0]?.shots[0]?.id || null;
+      this._selectedSceneId =
+        selection?.sceneId || project.scenes[0]?.id || null;
+      this._selectedShotId =
+        selection?.shotId || project.scenes[0]?.shots[0]?.id || null;
       this._loadedSceneId = null;
       this._saveProject();
       this._publish({ type: 'project-imported', project });
       this._updateStatus(`Imported ${file.name}`);
+      return true;
     } catch (error) {
-      if (this._destroyed || generation !== this._importGeneration) return;
+      if (
+        signal?.aborted ||
+        this._destroyed ||
+        generation !== this._importGeneration
+      )
+        return false;
       this._updateStatus(
         error instanceof SceneDocumentError
           ? `Import failed: ${error.message}`
@@ -1937,6 +2143,7 @@ export class SceneDirector {
    * @returns {Promise<boolean>} True only when every owned layer is released
    */
   async _releaseSceneLayers(scene, token = null) {
+    this._interactions?.clear();
     this._dataPacks?.clear();
     const layerIds = Array.isArray(scene?.releaseLayerIds)
       ? scene.releaseLayerIds
@@ -2164,6 +2371,7 @@ export class SceneDirector {
    * and resets UI buttons to the idle state.
    */
   _finishRun() {
+    this._setSceneMediaPlayback();
     this._clock.finish();
     this._setPlaybackKeyboardEnabled(false);
     // Covers the error path too: a run that threw mid-shot must not leave a
