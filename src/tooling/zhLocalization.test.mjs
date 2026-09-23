@@ -277,6 +277,7 @@ test('关键动态串仍能译出（上游改拼接方式时本测试变红）',
     ['TURNING OFF LIVE DATA', '正在关闭实时数据'],
   ];
 
+
   const failures = [];
   for (const [input, expected] of cases) {
     const got = lookup(input);
@@ -305,6 +306,146 @@ test("' · ' 分段翻译：译出已知段，保留专有名词段", () => {
     if (got !== expected) failures.push(`${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`);
   }
   assert.deepEqual(failures, [], `分段翻译回归：\n  ${failures.join('\n  ')}`);
+});
+
+/**
+ * 气象三模块动态串门槛（上游 2026-09-23 新增 weather / wind / cyclones 图层）。
+ *
+ * 这三套图层的文案几乎全是 JS 拼接出来的动态串，**静态 HTML 门槛扫不到**：
+ * `collectHtmlStrings()` 只看 src/ui/templates/*.html，而这些串由
+ * src/layers/{weather,wind,cyclones}/index.js 的 getRowControls() 现拼，
+ * 再由 src/ui/layerPanel.js / railCards.js / weatherPanel.js 写进 DOM。
+ * 所以必须在这里单独固化，否则上游改拼接方式时汉化会静默退回英文。
+ *
+ * 其中两类最容易坏，专门各留了断言：
+ *   1. **多行 info 串** — layerPanel.js 把 `controls.info` 直接 textContent 进 DOM，
+ *      而 lookup() 会把所有空白压成单空格，整串必然查不到。补丁因此在压平之前
+ *      先按 '\n' 逐行翻译（translateLines）。删掉那段就会整块退回英文。
+ *   2. **量词段** — `Air temperature · 2 m · 18.5 °C` 里的 `2 m` 只含 1 个字母，
+ *      旧版 translateSegments 把它当纯数据段直接保留、根本不查规则。
+ *      现在纯数据段也会过一遍 lookup（命中才替换），故 `2 m` → `2 米`，
+ *      而 `18.5 °C`、`3.2 km` 仍保留原文（见下方防误译断言）。
+ */
+test('气象/风场/气旋动态串（含多行 info）必须译出', () => {
+  const { lookup } = loadPatch();
+  const cases = [
+    // 右侧气象栏面板壳
+    ['WEATHER', '气象'],
+    ['Active weather products', '当前生效的气象产品'],
+    ['Observed history', '观测历史'],
+    ['LATEST · newest per product', '最新 · 各产品取最新帧'],
+
+    // weatherPanel.js 的 detail：' · ' 复合串 + 相对时间 + 帧关系后缀
+    ['Rain radar · US', '降雨雷达 · 美国'],
+    ['Observed · 09-23 12:00 UTC · 45m ago', '观测 · 09-23 12:00 UTC · 45 分钟前'],
+    ['Observed · 09-23 12:00 UTC · 2h 15m ago', '观测 · 09-23 12:00 UTC · 2 小时 15 分钟前'],
+    ['History · 09-23 11:00 UTC · 25 min ago · synced', '历史 · 09-23 11:00 UTC · 25 分钟前 · 已同步'],
+    ['History · 09-23 11:00 UTC · 25 min ago · nearest', '历史 · 09-23 11:00 UTC · 25 分钟前 · 最近帧'],
+
+    // weather/index.js 多行 info（layerPanel 直接 textContent 进 DOM）
+    [
+      'RADAR REFLECTIVITY · dBZ\nLatest observation: 09-23 12:00 UTC\n45m ago · frame 3/12 · loading\nContiguous US · gaps ≠ no rain',
+      '雷达反射率 · dBZ\n最新观测: 09-23 12:00 UTC\n45 分钟前 · 第 3/12 帧 · 加载中\n美国本土 · 空白处不代表无降雨',
+    ],
+    [
+      'LIGHTNING DENSITY · 15 min accumulation\nHistory: 09-23 11:00 UTC\n25 min ago\nAmericas + Pacific · not individual strikes\nColor: strikes/km²/min ×10³',
+      '闪电密度 · 15 分钟累计\n历史: 09-23 11:00 UTC\n25 分钟前\n美洲 + 太平洋 · 非单次闪电\n颜色: 次/平方公里/分钟 ×10³',
+    ],
+
+    // wind/index.js：summary + 读数卡
+    ['Global · 1° grid', '全球 · 1° 网格'],
+    ['GFS forecast · 09-23 12:00 UTC', 'GFS 预报 · 09-23 12:00 UTC'],
+    ['Loading forecast', '正在加载预报'],
+    ['Preparing flow', '正在准备流场'],
+    ['12.3 km/h from NNE', '12.3 km/h 来自东北偏北'],
+    ['0.0 km/h · calm', '0.0 km/h · 无风'],
+    ['WIND AT 34.56°N 120.34°W', '风况 @ 34.56°N 120.34°W'],
+    ['GFS · valid 09-23 12:00 UTC', 'GFS · 有效时间 09-23 12:00 UTC'],
+    // 量词段：'2 m' 必须译出，同时 '18.5 °C' 保留
+    ['Air temperature · 2 m · 18.5 °C', '气温 · 2 米 · 18.5 °C'],
+    ['Sea-level pressure · 1013.2 hPa', '海平面气压 · 1013.2 hPa'],
+    ['Forecast · does not follow history', '预报 · 不随历史回放变化'],
+    [
+      'Forecast · valid 09-23 12:00 UTC · issued 09-23 06:00 UTC · Does not follow history',
+      '预报 · 有效时间 09-23 12:00 UTC · 发布于 09-23 06:00 UTC · 不随历史回放变化',
+    ],
+    [
+      'GFS forecast · Wind speed (km/h)\nValid: 09-23 12:00 UTC · loading\nIssued: 09-23 06:00 UTC · STALE',
+      'GFS 预报 · 风速（km/h）\n有效时间: 09-23 12:00 UTC · 加载中\n发布时间: 09-23 06:00 UTC · 已过期',
+    ],
+    ['No frame within 30 min of 09-23 12:00 UTC', '在 09-23 12:00 UTC 前后 30 分钟内无可用帧'],
+    ['No frame within 2 h of 09-23 12:00 UTC', '在 09-23 12:00 UTC 前后 2 小时内无可用帧'],
+
+    // cyclones/index.js：NHC 强度分级 + 风暴详情
+    ['Cyclones · NHC / CPHC', '气旋 · NHC / CPHC'],
+    ['Atlantic · E/C Pacific', '大西洋 · 东/中太平洋'],
+    ['Official advisory ↗', '官方公报 ↗'],
+    ['Center-track uncertainty cone', '中心路径不确定性锥'],
+    ['Track and cone match this advisory', '路径与锥体均对应本份公报'],
+    ['Track/cone awaiting advisory 12', '路径/锥体待第 12 号公报'],
+    ['No active NHC/CPHC systems', '当前无生效的 NHC/CPHC 气旋系统'],
+    ['Hurricane', '飓风'],
+    ['Tropical storm', '热带风暴'],
+    ['Tropical depression', '热带低压'],
+    ['Potential tropical cyclone', '潜在热带气旋'],
+    ['Subtropical depression', '副热带低压'],
+    ['3 active storms', '3 个活跃风暴'],
+    ['1 active storm', '1 个活跃风暴'],
+    ['Position as of 09-23 12:00 UTC', '位置截至 09-23 12:00 UTC'],
+    ['Maximum sustained wind: 85 kt · Pressure: 965 hPa', '最大持续风速: 85 kt · 气压: 965 hPa'],
+    [
+      'Katrina · Hurricane · Advisory 12 · issued 09-23 06:00 UTC\nPosition as of 09-23 12:00 UTC\nMaximum sustained wind: 85 kt · Pressure: 965 hPa\nTrack and cone match this advisory\nAtlantic and eastern/central North Pacific; not worldwide cyclone coverage.',
+      'Katrina · 飓风 · 第 12 号公报 · 发布于 09-23 06:00 UTC\n位置截至 09-23 12:00 UTC\n最大持续风速: 85 kt · 气压: 965 hPa\n路径与锥体均对应本份公报\n大西洋与北太平洋东部/中部；并非全球气旋覆盖。',
+    ],
+    // labels.js 预报点悬停标注（提前小时数）
+    ['24 h', '24 小时'],
+  ];
+
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) failures.push(`${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(failures, [], `气象三模块动态串回归（上游改了拼接方式或补丁的多行/量词处理坏了）：\n  ${failures.join('\n  ')}`);
+});
+
+test('量词段翻译不得波及单位数据与既有距离显示', () => {
+  const { lookup } = loadPatch();
+  // translateSegments 现在让「纯数据段」也过一遍 lookup（为了让 '2 m' 能译成 '2 米'）。
+  // 这道测试守住它的副作用边界。分两类断言，不要混在一起：
+  //   A. 单段数据串必须完全不动（lookup 返回 null = 补丁不介入）；
+  //   B. 含 ' · ' 的复合串允许译出已知段，但数据段/专有名词段必须原样保留。
+  const untouched = [
+    '18.5 °C',
+    '3.2 km',
+    '7.6 km/s',
+    '5 m²',
+    '1013.2 hPa',
+    '85 kt',
+    '09-23 12:00 UTC',
+  ];
+  const wronglyTouched = untouched.filter((t) => lookup(t) !== null);
+  assert.deepEqual(
+    wronglyTouched,
+    [],
+    `以下单位/数据串被误译（量词规则波及过宽）：${wronglyTouched.map((f) => `${JSON.stringify(f)} → ${JSON.stringify(lookup(f))}`).join(', ')}`,
+  );
+
+  // B 类：数据段与专有名词段必须留在原位
+  assert.equal(lookup('ASCENT PATH · 3.2 km'), '上升轨迹 · 3.2 km');
+  assert.equal(lookup('SATELLITE SPEED · 7.6 km/s'), '卫星速度 · 7.6 km/s');
+  assert.equal(lookup('CURRENT DISTANCE FROM EARTH · 412 km'), '当前离地距离 · 412 km');
+  assert.equal(lookup('LAUNCH SITE · Vandenberg SLC-4E'), '发射场 · Vandenberg SLC-4E');
+  // 面积单位 m² 不得被成长度量词规则当成 'N m'
+  assert.equal(lookup('5 m²'), null);
+
+  // 距离显示语境里 `N m` 就是米，与气温高度量词同义，这是预期收益
+  assert.equal(lookup('350 m'), '350 米');
+
+  // 幂等：译文回写后不得被二次改写（MutationObserver 抖动防线）
+  for (const settled of ['2 米', '气温 · 2 米', '降雨雷达 · 美国', '加载中', '第 3/12 帧']) {
+    assert.equal(lookup(settled), null, `译文被二次改写：${JSON.stringify(settled)}`);
+  }
 });
 
 test("上游用已汉化标题拼串：'Expand 数据图层' 不得半中半英", () => {

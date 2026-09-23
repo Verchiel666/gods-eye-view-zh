@@ -2,6 +2,39 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.3.0 — 2026-09-23
+
+同步上游 17 个提交（198 文件，+31641/-1852）后的一轮汉化补全。上游无冲突，汉化补丁文件独立。**本轮上游新增了三个全新图层模块——气象影像（`src/layers/weather/`）、风场（`src/layers/wind/`）、热带气旋（`src/layers/cyclones/`），以及配套的读数面板体系（`src/ui/weatherPanel.js`、`railCards.js`、`railTimeline.js`、`chipGroup.js`）**，文案量远超前几轮。
+
+### 新增
+
+- **右侧气象栏面板壳**（上游新增 `src/ui/templates/context.html` 的 `#weather-panel`）— 覆盖率门槛测试直接报出 2/322 条未汉化：`WEATHER`(气象)、`Active weather products`(当前生效的气象产品)。
+- **气象影像图层**（雷达反射率 / 闪电密度 / GOES 红外 / 全球红外）：产品名、区域覆盖徽标（`CONUS`→美国本土、`Americas + Pacific`→美洲 + 太平洋）、影像模式（`Clouds only`/`Full`/`Soft`/`Vivid`）、`REGION`/`IMAGE`/`OPACITY` 设置分组、全部状态串与三段 `infoTitle` 长说明。
+- **风场图层**：`Wind motion`/`Wind speed`/`Sea-level pressure`/`Air temperature · 2 m` 场数据名、`MODEL`/`FIELD`/`UNITS`/`MOTION` 分组、GFS 与 ECMWF IFS 模式名、16 方位罗盘（`NNE`→东北偏北 等）、读数卡 `WIND AT ...`、以及 10 米地面风那段最长的 `infoTitle` 免责声明。
+- **热带气旋图层**：NHC 六级强度分级（`Hurricane`→飓风、`Tropical depression`→热带低压 等）、公报编号、路径/不确定性锥说明、`Maximum sustained wind: ... · Pressure: ...` 动态行。
+- 词典从 501 条扩充到 **634 条**，动态串规则 51 → **81 条**。
+
+### 修复（两处结构性缺陷，均由实测探针抓出）
+
+- **多行 `info` 串完全无法汉化** — `src/ui/layerPanel.js` 把 `controls.info` 直接 `textContent` 进 DOM，而三个新图层都用 `\n` 拼接多行说明文本。`lookup()` 开头会把所有空白压成单空格，于是这些串在词典/规则里永远查不到对应键，整块静默退回英文。
+  - 现在 `lookup()` 在压平空白**之前**先走 `translateLines()`：按 `\n` 拆开逐行翻译（行内不含换行，不会递归回来），再拼回。与 `translateSegments` 同样的保守口径——一行都没译出就整体放弃，绝不产出半中半英。
+- **`' · '` 复合串里的单位量词段被跳过** — `Air temperature · 2 m · 18.5 °C` 会译成「气温 · 2 m · 18.5 °C」。根因是 `translateSegments` 把「不含 2 个连续字母」的段判定为纯数据后**直接 push 原文、根本不调用 lookup**，`2 m` 只有 1 个字母，量词规则因此没有生效机会。
+  - 改为纯数据段也过一遍 `lookup()`：命中才替换（`2 m`→`2 米`、`30 min`→`30 分钟`、`24 h`→`24 小时`），查不到照旧保留。
+  - **副作用边界已守住并加了测试**：`3.2 km`、`7.6 km/s`、`18.5 °C`、`1013.2 hPa`、`85 kt`、`09-23 12:00 UTC` 全部仍返回 `null`（补丁不介入）；面积单位 `5 m²` 不会被成长度量词误当；既有的 `ASCENT PATH · 3.2 km`、`LAUNCH SITE · Vandenberg SLC-4E` 等分段行为无回退。
+- **`dictOnly` 不做「首字母大写提升」** — 风速读数走 `0.0 km/h · calm`（小写）而 `windFrom()` 返回 `'Calm'`（大写），两者会分别落到分段与词典两条路径。原以为写一个 `'Calm'` 就能靠大小写兜底命中，实测不行：`dictOnly` 只试精确 / 全大写 / 全小写三种形式，`calm` → `CALM`/`calm` 都不等于 `Calm`。**两个大小写形式必须各自建键**，已在词典注释里写明。
+
+### 门槛强化（防止本轮工作再次静默失效）
+
+- 新增测试 **`气象/风场/气旋动态串（含多行 info）必须译出`** — 固化 40+ 条真实动态串。这三套图层的文案几乎全是 `getRowControls()` 现拼的，**静态 HTML 门槛（`collectHtmlStrings()` 只扫 `src/ui/templates/*.html`）扫不到**，所以必须单独设门槛，否则上游改拼接方式时不会有任何信号。
+- 新增测试 **`量词段翻译不得波及单位数据与既有距离显示`** — 上面第二处修复放开了纯数据段的规则匹配，这道测试守住它的副作用边界，分「单段串必须完全不动」与「复合串的数据段必须原位保留」两类断言。
+- 两道新门槛都做了**反向验证**（不是只看绿灯）：临时禁用多行分段 → 气象测试变红；把 `translateSegments` 改回旧行为 → 精确报出「期望 `气温 · 2 米 · 18.5 °C` / 实际 `气温 · 2 m · 18.5 °C`」。恢复后 16/16 全绿。
+- 汉化门槛测试从 14 例增至 **16 例**，静态文案覆盖 **322/322 = 100%**。
+
+### 验证
+
+- 汉化门槛 **16/16 全绿**；完整测试套件 **4642 / 4632 通过 / 0 失败 / 10 跳过**；`npm run build` 通过；`check:boundaries` 通过。
+- **依赖有漂移，已 `npm install`**：`package-lock.json` 变更（硬信号），上游新增 `@meri-imperiumi/eccodes-wasm@^2.48.2`（GRIB 气象数据解码）与 `hls.js@^1.7.3`（CCTV 视频流）。不装的话本地构建/测试会因缺模块失败。
+
 ## zh-1.2.1 — 2026-09-16
 
 同步上游 62 个提交（Director 场景数据包与镜头指令 #610–#613、实时公交 GTFS-Realtime #587、尼泊尔洪水场景 #590、语音 Realtime 状态归属重构、transit/voice 若干修复）后的一轮汉化补全。上游无冲突，汉化补丁文件独立。

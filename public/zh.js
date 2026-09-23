@@ -394,7 +394,166 @@
     'Reset map bearing to north': '将地图朝向重置为正北',
     'Tilt map to oblique view': '将地图倾斜为斜视角',
     'Reset map to north up': '重置地图为上北朝向',
-    'Return map to straight-down view': '恢复地图为正俯视视角'
+    'Return map to straight-down view': '恢复地图为正俯视视角',
+
+    // ===== 右侧气象栏（src/ui/templates/context.html #weather-panel）=====
+    // 注意：本区块内的注释不要写出「引号包裹的键 + 冒号」这种形式
+    // （例如注释里引用 WIND 词条并跟一个冒号），门槛测试用正则扫原文，
+    // 会把注释内容误判成重复词典键。
+    // WEATHER 是全大写面板标题，与既有大写状态词体系一致，
+    // 也不与手绘滤镜的 Clear / Snow 等首字母大写词冲突。
+    'WEATHER': '气象',
+    'Active weather products': '当前生效的气象产品',
+
+    // ===== 气象读数面板（src/ui/weatherPanel.js）=====
+    'Active weather': '当前生效的气象产品',
+    'Observed history': '观测历史',
+    'Rain radar': '降雨雷达',
+    'Satellite clouds': '卫星云图',
+    'Lightning density': '闪电密度',
+    'LATEST · newest per product': '最新 · 各产品取最新帧',
+    // 下面三行是 ' · ' 复合串被 translateSegments 拆分后的**单段**，
+    // 分段前会 trim()，所以键里不能带前导 ' · '。
+    'synced': '已同步',
+    'nearest': '最近帧',
+    'Does not follow history': '不随历史回放变化',
+
+    // ===== 风场图层（src/layers/wind/index.js、presentation.js、inspection.js）=====
+    'Wind motion': '风的运动',
+    'Wind speed': '风速',
+    'Sea-level pressure': '海平面气压',
+    'Air temperature · 2 m': '气温 · 2 米',
+    'Global · 1° grid': '全球 · 1° 网格',
+    'Loading forecast': '正在加载预报',
+    'Preparing flow': '正在准备流场',
+    'Selected field unavailable': '所选场数据不可用',
+    'Cached forecast · stale': '缓存预报 · 已过期',
+    'ECMWF IFS': 'ECMWF IFS', 'NOAA GFS': 'NOAA GFS',
+    'ECMWF': 'ECMWF', 'GFS': 'GFS',
+    'ECMWF IFS surface forecast': 'ECMWF IFS 地面预报',
+    'NOAA GFS surface forecast': 'NOAA GFS 地面预报',
+    'Reduced motion': '已降低动效',
+    'Resume': '继续', 'Pause': '暂停',
+    'Pause visual flow; forecast time does not advance with animation':
+      '暂停可视化流场；预报时间不会随动画推进',
+    'None': '无', 'Speed': '风速', 'Pressure': '气压', 'Temperature': '气温',
+    'Wind trails with no field shading': '仅显示风的轨迹，不着色场数据',
+    'How hard the surface wind is blowing': '地面风的强弱程度',
+    'Sea-level air pressure: broad highs and lows': '海平面气压：大范围的高压与低压',
+    'Air temperature two meters above the surface': '地表以上 2 米处的气温',
+    'Wind speed units': '风速单位',
+    'Read wind at map center': '读取地图中心的风况',
+    'Read the forecast at the center of the map without changing selection':
+      '读取地图中心处的预报值，不改变当前选择',
+    'MODEL': '模式', 'FIELD': '场数据', 'UNITS': '单位', 'MOTION': '动效',
+    'Forecast': '预报',
+    // 风速读数 `${speed} from ${dir}` 与 `${speed} · calm` 两种形态。
+    // 'Calm' 首字母大写形式给 inspection.js 的 windFrom() 返回值用；
+    // 小写 'calm' 是 ' · ' 分段后落到词典的那一段——dictOnly 只做
+    // 精确 / 全大写 / 全小写三次尝试，**不会**把 'calm' 提升到 'Calm'，
+    // 所以两个大小写形式必须各自建键，不能只写一个。
+    'Calm': '无风', 'calm': '无风',
+    // 读数卡把 scalarLabel 与 scalarValue 用 ' · ' 拼成一行
+    // （`Air temperature · 2 m · 18.5 °C`），分段后第一段是 'Air temperature'，
+    // 因此除了完整标签 'Air temperature · 2 m'，还需要这个较短的键。
+    'Air temperature': '气温',
+    // 覆盖范围徽标 'Rain radar · US' 分段后的 'US' 段。只建大写键：
+    // dictOnly 会依次试精确 / 全大写 / 全小写，故 'US' 不会让电台面板里
+    // 作为国家码数据展示的 'us' 之类被误改（且当前无此可见用法）。
+    'US': '美国',
+    // 图层状态徽标（src/data/layerSnapshot.js LAYER_FEED_STATE_LABELS），
+    // 气象 info 串里也会以 ' · STALE' 形式出现。
+    'STALE': '已过期',
+    'No surface reading': '无地面读数',
+    'Wind unavailable': '风场数据不可用',
+    'Wind source unavailable': '风场数据源不可用',
+    'Wind requires a snapshot source': '风场需要快照数据源',
+    'Aim the map center at Earth': '请将地图中心对准地球',
+    'Surface wind at 10 m. Approximately 1° global grid. Curves follow the 10 m wind field, lifted 12 km for visibility; display height is not weather altitude. View lighting is for readability. Animation shows flow through one fixed forecast; it does not advance time. Color fields drape the globe basemap or the active photorealistic 3D Tiles.':
+      '10 米高度处的地面风。全球网格约 1°。曲线沿 10 米风场绘制，为便于观察抬升了 12 公里；显示高度并非气象高度。视图打光是为了可读性。动画展示的是同一份固定预报内的流动，不会推进时间。彩色场数据贴合地球底图或当前启用的写实 3D Tiles。',
+
+    // ===== 天气影像图层（src/layers/weather/index.js）=====
+    'Clouds only': '仅云层', 'Full': '完整',
+    'The complete infrared image at the chosen opacity': '按所选不透明度显示完整红外影像',
+    'Soft': '柔和', 'Vivid': '鲜艳',
+    'Image opacity; does not alter the observed values': '影像不透明度；不会改变观测数值',
+    'REGION': '区域', 'IMAGE': '影像', 'OPACITY': '不透明度',
+    'History': '历史', 'Observed': '观测',
+    'CONUS': '美国本土', 'N. America': '北美', 'North America': '北美',
+    'Americas + Pacific': '美洲 + 太平洋',
+    'Global': '全球', 'Global · 60°S–60°N': '全球 · 南纬 60°–北纬 60°',
+    'GLOBAL INFRARED · hourly': '全球红外 · 每小时',
+    'GOES INFRARED · ~5 min': 'GOES 红外 · 约 5 分钟',
+    'RADAR REFLECTIVITY · dBZ': '雷达反射率 · dBZ',
+    'LIGHTNING DENSITY · 15 min accumulation': '闪电密度 · 15 分钟累计',
+    'Lightning density · 15 min': '闪电密度 · 15 分钟',
+    'Rain radar · US': '降雨雷达 · 美国',
+    'NOAA nowCOAST': 'NOAA nowCOAST',
+    'Latest observation': '最新观测',
+    'Loading next frame…': '正在加载下一帧…',
+    'Map center outside coverage': '地图中心超出覆盖范围',
+    'Observation unavailable': '观测数据不可用',
+    'Source observations delayed': '数据源观测存在延迟',
+    'Stale source': '数据源已过期',
+    'Waiting for observation': '正在等待观测数据',
+    'Weather imagery unavailable': '气象影像不可用',
+    'Weather requires a snapshot source': '气象图层需要快照数据源',
+    'Weather unavailable': '气象数据不可用',
+    'View Americas & Pacific': '查看美洲与太平洋',
+    'View coverage': '查看覆盖范围',
+    'View US radar': '查看美国雷达',
+    'Contiguous US · gaps ≠ no rain': '美国本土 · 空白处不代表无降雨',
+    'Americas + Pacific · not individual strikes': '美洲 + 太平洋 · 非单次闪电',
+    '60°S–60°N · typically 2–3 h delayed': '南纬 60°–北纬 60° · 通常延迟 2–3 小时',
+    'North America · infrared imagery': '北美 · 红外影像',
+    'Map center is outside source coverage': '地图中心超出数据源覆盖范围',
+    'Reduced motion · history playback unavailable': '已降低动效 · 历史回放不可用',
+    'Reduced motion · manual history available': '已降低动效 · 可手动查看历史',
+    'STALE · cached source metadata': '已过期 · 缓存的数据源元信息',
+    'strikes/km²/min ×10³ (15-minute density)': '次/平方公里/分钟 ×10³（15 分钟密度）',
+    'dBZ radar reflectivity': 'dBZ 雷达反射率',
+    'NOAA/NWS 15-minute lightning density derived from Vaisala NLDN/GLD360. Coverage 110°E across the Pacific/Americas to 0°, 25°S–80°N. Not a live strike count, global coverage or a safety warning.':
+      'NOAA/NWS 15 分钟闪电密度，由 Vaisala NLDN/GLD360 数据推算。覆盖范围为东经 110° 横跨太平洋/美洲至 0°，南纬 25°–北纬 80°。这不是实时闪电计数，不是全球覆盖，也不是安全预警。',
+    'NOAA MRMS radar echoes indicate precipitation patterns, not rain rate, a storm warning or a future forecast. Native source approximately 1 km; display is limited to level 6. Frames use exact advertised observation times.':
+      'NOAA MRMS 雷达回波反映的是降水形态，不是降雨强度、风暴预警或未来预报。原始数据源约 1 公里分辨率；显示精度限制为 6 级。各帧采用数据源公布的确切观测时间。',
+    'GOES-19/18 longwave infrared Band 14 regional; NESDIS global longwave mosaic. Clouds only dims everything but bright, cold cloud tops; a brightness filter, not a cloud mask. Coverage and freshness differ by region.':
+      'GOES-19/18 长波红外 14 通道（区域）；NESDIS 全球长波镶嵌图。「仅云层」会压暗除明亮冷云顶以外的一切，这是亮度滤镜，不是云掩膜。覆盖范围与更新时效因区域而异。',
+
+    // ===== 热带气旋图层（src/layers/cyclones/index.js、labels.js）=====
+    'Cyclones · NHC / CPHC': '气旋 · NHC / CPHC',
+    'Atlantic · E/C Pacific': '大西洋 · 东/中太平洋',
+    'Cyclone advisories': '气旋公报',
+    'Cyclone advisories unavailable': '气旋公报不可用',
+    'Active NHC and CPHC cyclone advisories': 'NHC 与 CPHC 当前生效的气旋公报',
+    'Cyclones require a snapshot source': '气旋图层需要快照数据源',
+    'Atlantic and eastern/central North Pacific; not worldwide cyclone coverage.':
+      '大西洋与北太平洋东部/中部；并非全球气旋覆盖。',
+    'Official advisory ↗': '官方公报 ↗',
+    'Advisory center / forecast track': '公报中心位置 / 预报路径',
+    'Center-track uncertainty cone': '中心路径不确定性锥',
+    'Track and cone match this advisory': '路径与锥体均对应本份公报',
+    'Track/cone unavailable': '路径/锥体不可用',
+    'Cached advisory · stale source': '缓存公报 · 数据源已过期',
+    'Loading advisories…': '正在加载公报…',
+    'Advisories unavailable': '公报不可用',
+    'No active NHC/CPHC systems': '当前无生效的 NHC/CPHC 气旋系统',
+    // 'Wind unavailable'（风暴列表里风速缺测时的占位）已在风场段定义，勿重复。
+    // NHC 强度分级（CLASSIFICATION_NAMES）
+    'Potential tropical cyclone': '潜在热带气旋',
+    'Hurricane': '飓风',
+    'Tropical storm': '热带风暴',
+    'Tropical depression': '热带低压',
+    'Subtropical storm': '副热带风暴',
+    'Subtropical depression': '副热带低压',
+    'Select a storm on the map, or choose a storm in the list to select it and move the camera. Click empty map space to clear the selection. NOAA NHC/CPHC advisory context. The cone describes forecast center-track uncertainty, not storm size or the full hazard area. Forecast point labels are source lead hours, not times computed from advisory issuance. Geometry follows the surface; height is not weather altitude. Consult the official advisory.':
+      '在地图上选择一个气旋，或在列表中点选以选中它并移动镜头。点击地图空白处可取消选择。数据来自 NOAA NHC/CPHC 公报。锥体表示预报中心路径的不确定性，不代表风暴尺寸或完整的影响区域。预报点标注的是数据源给出的提前小时数，不是由公报发布时间推算出的时刻。几何体贴合地表；其高度并非气象高度。请以官方公报为准。',
+
+    // ===== 气象读数解释文案 =====
+    'Interpolated model forecast on an approximately 1° grid. Broad weather patterns, not a street-level measurement.':
+      '在约 1° 网格上插值得到的模式预报。反映的是大尺度天气形势，不是街道级的实测值。',
+    'A location reading needs a loaded forecast and the Earth at the center of the view.':
+      '读取某地数值需要先加载预报数据，并将地球置于视图中心。',
+    'Forecast · does not follow history': '预报 · 不随历史回放变化'
   };
 
   /* ---------- 动态串规则（正则 → 译文函数），更具体的放前面 ---------- */
@@ -471,7 +630,90 @@
     [/^Landmark: (.+)$/, function (m) { return '地标: ' + m[1]; }],
     [/^MGRS: (.+)$/, function (m) { return 'MGRS 坐标: ' + m[1]; }],
     [/^CELL: (.+)$/, function (m) { return '网格: ' + m[1]; }],
-    [/^GRID: (.+)$/, function (m) { return '格网: ' + m[1]; }]
+    [/^GRID: (.+)$/, function (m) { return '格网: ' + m[1]; }],
+
+    // ===== 气象 / 风场 / 气旋三套新图层的动态串（2026-09-23 上游新增）=====
+    // 设计原则：优先给「' · ' 复合串里的原子片段」写规则，
+    // 复合串本身交给 translateSegments 自动拼装，避免为每种组合各写一条。
+    // 原子片段规则必须放在通用规则之前（RULES 按顺序首中即返回）。
+
+    // 相对时间：`2h 15m ago` / `45m ago` / `25 min ago`
+    [/^(\d+)h (\d+)m ago$/, function (m) { return m[1] + ' 小时 ' + m[2] + ' 分钟前'; }],
+    [/^(\d+)m ago$/, function (m) { return m[1] + ' 分钟前'; }],
+    [/^(\d+) min ago$/, function (m) { return m[1] + ' 分钟前'; }],
+
+    // info 串里的行内原子片段
+    [/^frame (\d+)\/(\d+)$/, function (m) { return '第 ' + m[1] + '/' + m[2] + ' 帧'; }],
+    [/^loading$/, function () { return '加载中'; }],
+    [/^preparing$/, function () { return '准备中'; }],
+    [/^Observation: unavailable$/, function () { return '观测数据: 不可用'; }],
+    [/^Color: strikes\/km²\/min ×10³$/, function () { return '颜色: 次/平方公里/分钟 ×10³'; }],
+    [/^wind remains visible$/, function () { return '风场仍保持显示'; }],
+
+    // 时间标注原子片段：`valid 09-23 12:00 UTC` / `issued ...`
+    [/^valid (.+)$/, function (m) { return '有效时间 ' + m[1]; }],
+    [/^issued (.+)$/, function (m) { return '发布于 ' + m[1]; }],
+    // `Valid: ...` / `Issued: ...` 是气象 info 串里的整行。
+    // 行内还可能带 ' · loading' / ' · STALE' 尾巴，所以捕获组要再过一次 tr()，
+    // 否则会留下半中半英（这是探针实测抓到的缺陷，不是推测）。
+    // 不会递归回本规则：尾巴不含 "Valid:" 前缀。
+    [/^Valid: (.+)$/, function (m) { return '有效时间: ' + tr(m[1]); }],
+    [/^Issued: (.+)$/, function (m) { return '发布时间: ' + tr(m[1]); }],
+    [/^Latest observation: (.+)$/, function (m) { return '最新观测: ' + tr(m[1]); }],
+    [/^History: (.+)$/, function (m) { return '历史: ' + tr(m[1]); }],
+
+    // 模式名 + forecast：`GFS forecast` / `ECMWF IFS forecast`
+    [/^(GFS|ECMWF IFS) forecast$/, function (m) { return m[1] + ' 预报'; }],
+
+    // 风场 info 首行：`Wind speed (km/h)` / `Sea-level pressure (hPa)`
+    [/^(Wind speed|Sea-level pressure|Air temperature · 2 m) \(([^)]+)\)$/,
+      function (m) { return tr(m[1]) + '（' + m[2] + '）'; }],
+
+    // 风速读数：`12.3 km/h from NNE`（Calm 时上游走 ' · calm' 分支，由词典处理）
+    [/^(.+?) from (N|NNE|NE|ENE|E|ESE|SE|SSE|S|SSW|SW|WSW|W|WNW|NW|NNW)$/, function (m) {
+      var COMPASS = {
+        N: '北', NNE: '东北偏北', NE: '东北', ENE: '东北偏东',
+        E: '东', ESE: '东南偏东', SE: '东南', SSE: '东南偏南',
+        S: '南', SSW: '西南偏南', SW: '西南', WSW: '西南偏西',
+        W: '西', WNW: '西北偏西', NW: '西北', NNW: '西北偏北'
+      };
+      return m[1] + ' 来自' + COMPASS[m[2]];
+    }],
+    // 风场读数卡标题：`WIND AT 34.56°N 120.34°W`
+    [/^WIND AT (.+)$/, function (m) { return '风况 @ ' + m[1]; }],
+
+    // 图例说明：`10 dBZ radar reflectivity` / `5 strikes/km²/min ×10³ (15-minute density)`
+    [/^(\d+(?:\.\d+)?) dBZ radar reflectivity$/, function (m) { return m[1] + ' dBZ 雷达反射率'; }],
+    [/^(\d+(?:\.\d+)?) strikes\/km²\/min ×10³ \(15-minute density\)$/,
+      function (m) { return m[1] + ' 次/平方公里/分钟 ×10³（15 分钟密度）'; }],
+
+    // 气旋：`Advisory 12` / `85 kt` / `Position as of ...` / `Maximum sustained wind: ... · Pressure: ...`
+    [/^Advisory (\d+)$/, function (m) { return '第 ' + m[1] + ' 号公报'; }],
+    [/^Position as of (.+)$/, function (m) { return '位置截至 ' + m[1]; }],
+    [/^Maximum sustained wind: (.+?) · Pressure: (.+)$/,
+      function (m) { return '最大持续风速: ' + m[1] + ' · 气压: ' + m[2]; }],
+    [/^(\d+) active storms?$/, function (m) { return m[1] + ' 个活跃风暴'; }],
+    [/^Track\/cone awaiting advisory (\d+)$/,
+      function (m) { return '路径/锥体待第 ' + m[1] + ' 号公报'; }],
+    // 捕获组同样要过 tr()：`No frame within 30 min of 09-23 12:00 UTC`
+    // 里的 '30 min' 是量词段，否则译文里会留下英文单位。
+    // 空格按译文末字符判断：译成中文时不能再补空格（否则是「30 分钟 内」）。
+    [/^No frame within (.+?) of (.+)$/, function (m) {
+      var gap = tr(m[1]);
+      return '在 ' + m[2] + ' 前后 ' + gap
+        + (/[一-鿿]/.test(gap.slice(-1)) ? '' : ' ') + '内无可用帧';
+    }],
+
+    // 风场读数卡的 `Air temperature · 2 m · 18.5 °C` 由 translateSegments
+    // 逐段处理（`Air temperature` 走词典、`2 m` 走下方量词规则、`18.5 °C` 保留），
+    // 不再需要为这种组合单独写整串规则。
+
+    // 气象预报点悬停标注：`24 h`（提前小时数）
+    [/^(\d+) h$/, function (m) { return m[1] + ' 小时'; }],
+    // 帧间隔量词：`30 min`（weather/index.js 的 maxGap、weatherPanel.js 的 gap）
+    [/^(\d+) min$/, function (m) { return m[1] + ' 分钟'; }],
+    // 气温标签的高度量词：`2 m`（'Air temperature · 2 m' 分段后的单段）
+    [/^(\d+) m$/, function (m) { return m[1] + ' 米'; }]
   ];
 
   /* 词典直查（不含分段/规则），供 RULES 内部复用 */
@@ -516,7 +758,18 @@
     for (var i = 0; i < parts.length; i++) {
       var seg = parts[i].trim();
       if (!seg) continue;                                  // 空段丢弃
-      if (!/[A-Za-z]{2}/.test(seg)) { out.push(seg); continue; }  // 纯数字/符号原样保留
+      if (!/[A-Za-z]{2}/.test(seg)) {
+        // 纯数据段（如 `3.2 km`、`18.5 °C`）默认保留原文——地名/编号等专有名词
+        // 不能被误译。但**单位量词段**（`2 m`、`30 min`、`24 h`）只含 1 个字母，
+        // 早期版本在这里直接 push 原文、根本不查规则，导致
+        // `Air temperature · 2 m · 18.5 °C` 半中半英。改为仍然过一遍 lookup：
+        // 命中规则才替换（如 `/^(\d+) m$/` → `2 米`），查不到照旧保留。
+        // 副作用边界由「量词段翻译不得波及单位数据与既有距离显示」测试守住。
+        var dv = lookup(seg);
+        if (dv === null) { out.push(seg); }
+        else { out.push(dv); hits++; }
+        continue;
+      }
       var v = lookup(seg);
       if (v === null) { out.push(seg); }                   // 未命中：保留原文（可能是地名等专有名词）
       else { out.push(v); hits++; }
@@ -542,8 +795,38 @@
     return null;
   }
 
+  /* ---------- 多行分段：含 '\n' 的串逐行翻译后拼回 ----------
+   * 气象/风场图层的 info 串是多行文本（src/ui/layerPanel.js 直接把它
+   * textContent 进 DOM），而下面的 lookup() 会把所有空白压成单个空格，
+   * 整串因此永远查不到词典。这里在压平**之前**先按行拆开，逐行走正常
+   * lookup（行内不含 '\n'，不会递归回到本函数）。
+   * 与 translateSegments 同样的保守口径：一行都没译出就整体放弃。 */
+  function translateLines(raw) {
+    var s = String(raw == null ? '' : raw);
+    if (s.indexOf('\n') < 0) return null;
+    var lines = s.split('\n');
+    if (lines.length < 2) return null;
+    var out = [];
+    var hits = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!line.trim()) { out.push(line); continue; }      // 空行原样保留
+      var v = lookup(line.trim());
+      if (v === null) { out.push(line); }                   // 未命中：保留原文
+      else { out.push(v); hits++; }
+    }
+    if (hits < 1) return null;
+    return out.join('\n');
+  }
+
   function lookup(raw) {
-    var t = String(raw).replace(/\s+/g, ' ').trim();
+    var s = String(raw == null ? '' : raw);
+    // 多行串优先按行拆分（必须在压平空白之前做）
+    if (s.indexOf('\n') >= 0) {
+      var byLine = translateLines(s);
+      if (byLine !== null) return byLine;
+    }
+    var t = s.replace(/\s+/g, ' ').trim();
     if (!t || t.length < 2) return null;
     if (/[一-鿿]/.test(t)) {
       // 已含中文 → 防回环：默认整串跳过。
