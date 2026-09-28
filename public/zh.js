@@ -553,8 +553,175 @@
       '在约 1° 网格上插值得到的模式预报。反映的是大尺度天气形势，不是街道级的实测值。',
     'A location reading needs a loaded forecast and the Earth at the center of the view.':
       '读取某地数值需要先加载预报数据，并将地球置于视图中心。',
-    'Forecast · does not follow history': '预报 · 不随历史回放变化'
+    'Forecast · does not follow history': '预报 · 不随历史回放变化',
+
+    // ===== 赛博声呐（2026-09-28 上游新增：src/ui/cyberSonarControls.js、
+    //       src/cyberSonar*.js、src/ui/templates/display-controls.html）=====
+    // 'Cyber' 是 HUD 布局的第四个风格选项，与既有的 Tactical(战术)/Operator(操作员)/
+    // Minimal(极简) 并列，都是视觉主题名而非普通形容词。
+    'Cyber': '赛博',
+    'Sonar': '声呐',
+    'Rings': '环数',
+    // ⚠ 'Range' 只建首字母大写形式：CCTV 校准模块另有全大写紧凑缩写 RANGE
+    // （src/ui/cctvCalibration.js，与 HDG/PITCH/FOV/HGT 并列的仪表标签，按惯例保留）。
+    // 词典精确匹配优先于大小写兜底，两者可共存，不要顺手补 'RANGE'。
+    'Range': '范围',
+    'Power': '强度',
+    'Sector': '扇区',
+    'Cyber sonar contact scanner': '赛博声呐目标扫描器',
+    'Minimum opacity for map dots, icons, models, brackets, and labels between sonar passes':
+      '两次声呐扫描之间，地图圆点、图标、模型、方框与标注的最低不透明度',
+    'Sonar ring count': '声呐环数',
+    'Sonar ring range': '声呐环范围',
+    'Sonar intensity': '声呐强度',
+    'Cyber contact and label opacity': '赛博目标与标注不透明度',
+    'Sonar sector width': '声呐扇区宽度',
+    // GPU 不可用时的状态输出（src/cyberSonarScene.js → #cyber-sonar-status）
+    'Contact GPU unavailable. Native contacts remain visible.':
+      '目标 GPU 加速不可用，仍显示原生目标。',
+
+    // ===== 本地 RTL-SDR 接收器（2026-09-28 上游新增：src/sdr/controller.js、
+    //       src/ui/localSdr*.js、src/ui/templates/context.html #sdr-radio-card）=====
+    'Internet radio and local SDR': '网络电台与本地 SDR',
+    'Local RTL-SDR receiver': '本地 RTL-SDR 接收器',
+    'LOCAL RTL-SDR': '本地 RTL-SDR',
+    'NO USB': '无 USB',
+    'Chrome/Edge · WebUSB · one local tuner shared by FM and the Local ADS-B layer.':
+      'Chrome/Edge · WebUSB · 调频与本地 ADS-B 图层共用同一台本地调谐器。',
+    'Connect an RTL-SDR to begin.': '请先连接 RTL-SDR 设备。',
+    'CONNECT': '连接',
+    'DISCONNECT': '断开',
+    'CONNECTING': '连接中',
+    'TUNING': '调谐中',
+    'STREAMING': '接收中',
+    'IDLE': '待机',
+    'LOCATE': '定位',
+    'LOCATED': '已定位',
+    'LOCATING…': '定位中…',
+    'Use your location for faster ADS-B position decoding': '使用你的位置以加快 ADS-B 位置解码',
+    'CHANGE DEVICE': '更换设备',
+    'Choose a different RTL-SDR or receiver channel': '选择另一台 RTL-SDR 或接收通道',
+    'RTL-SDR receiver mode': 'RTL-SDR 接收模式',
+    'FM': '调频',
+    'ADS-B · 1090': 'ADS-B · 1090',
+    'GAIN': '增益',
+    'AUTO': '自动',
+    'RTL-SDR tuner gain for the current mode': '当前模式下的 RTL-SDR 调谐器增益',
+    'MSG/S': '条/秒',
+    'HEARD': '已收到',
+    'POSITIONED': '已定位',
+    'IQ': 'IQ',
+    'FM MHZ': '调频 MHz',
+    'TUNE': '调谐',
+    'Seek broadcast FM stations': '搜索广播调频电台',
+    '◀ SEEK': '◀ 搜台',
+    'SEEK ▶': '搜台 ▶',
+    'SDR VOL': 'SDR 音量',
+    'Local SDR volume': '本地 SDR 音量',
+    // SDR 控制器状态消息（src/sdr/controller.js、src/layers/localAdsb/status.js）
+    'WebUSB needs desktop Chrome or Edge': 'WebUSB 需要桌面版 Chrome 或 Edge',
+    'WebUSB requires desktop Chrome or Edge': 'WebUSB 需要桌面版 Chrome 或 Edge',
+    'connect a receiver in Radio': '请在电台面板中连接接收器',
+    'receiver is in FM mode': '接收器正处于调频模式',
+    'SDR decoder worker failed': 'SDR 解码工作线程失败',
+    'Waiting for an RTL-SDR device…': '正在等待 RTL-SDR 设备…',
+    'RTL-SDR sample stream stopped': 'RTL-SDR 采样流已停止',
+    'RTL-SDR gain change failed': 'RTL-SDR 增益调整失败',
+    'Browser location is unavailable': '浏览器位置不可用',
+    'Receiver location was not granted': '未授予接收器位置权限',
+    'No FM signal found': '未找到调频信号',
+    'Seek stopped': '搜台已停止',
+    'Local FM stopped: internet radio started': '本地调频已停止：网络电台已开始播放',
+    'opening receiver': '正在打开接收器',
+    'checking decoder feeds': '正在检查解码数据源',
+    'listening': '监听中',
+    'waiting for IQ': '等待 IQ 数据',
+    'USB error': 'USB 错误',
+
+    // ===== 近期影像面板（2026-09-28 上游新增：src/ui/recentImagery.js、
+    //       src/layers/recentImagery/、src/ui/imageryBoxTool.js、imagerySplit.js、
+    //       src/ui/templates/context.html #recent-imagery-panel）=====
+    'RECENT IMAGERY': '近期影像',
+    'Recent imagery': '近期影像',
+    'Imagery days in the box': '框选范围内的影像天数',
+    'NO BOX': '未选框',
+    'No box': '未选框',
+    'SEARCHING': '搜索中',
+    'Searching': '搜索中',
+    'ZOOM IN': '放大',
+    'Fly in until the view fits the 1,000 km limit': '推进镜头，直到视图满足 1,000 公里上限',
+    'Imagery days, newest first · arrows move, S or A and B pin':
+      '影像日期，最新在前 · 方向键移动，S 或 A/B 键固定',
+    'On the map': '地图上的显示',
+    'Mode': '模式',
+    'VS BASEMAP': '对比底图',
+    'Imagery opacity': '影像不透明度',
+    'SWAP': '交换',
+    'Trade the two sides of the divider': '交换分隔线两侧',
+    'SELECT BOX': '选择框',
+    'Drag a box on the map (Esc cancels)': '在地图上拖出框选范围（Esc 取消）',
+    'USE VIEW': '使用当前视图',
+    'Use the current view as the box': '以当前视图作为框选范围',
+    'Forget the box and its images': '清除框选范围及其影像',
+    'START HERE': '建议首选',
+    'Newest low-cloud day for this box · scene cloud, not box cloud':
+      '该范围内云量最少的一天 · 以画面云量为准，非全框云量',
+    'Newest day covering this box · cloudier than 20%': '覆盖该范围的最新一天 · 云量高于 20%',
+    'Newest day with imagery for this box · partial coverage':
+      '该范围内有影像的最新一天 · 部分覆盖',
+    'Newest daily overview for this box': '该范围内最新的每日总览',
+    'newest clear day': '最新晴朗日',
+    'newest day (cloudy)': '最新一天（多云）',
+    'newest day (partial coverage)': '最新一天（部分覆盖）',
+    'newest overview': '最新总览',
+    'PREVIEW': '预览',
+    'Preview': '预览',
+    'LOADING': '加载中',
+    'Loading': '加载中',
+    'Checking': '检查中',
+    'SHOW': '显示',
+    'Unpin the image': '取消固定该影像',
+    'EXPORT': '导出',
+    'HIDE EMPTY DAYS': '隐藏空白日',
+    'Days the probe found empty in this box': '该范围内探测为空白的天数',
+    'Details': '详情',
+    'Times, coverage, sources': '时间、覆盖率、数据源',
+    'Not set': '未设置',
+    'Basemap': '底图',
+    'The basemap': '底图',
+    'BASEMAP': '底图',
+    'Every day is empty here': '此范围内每日均为空白',
+    'Sources off': '数据源已关闭',
+    'No imagery': '无影像',
+    'no imagery': '无影像',
+    'cloud unknown': '云量未知',
+    // 'Unavailable' 已在上方设施区块定义（同为「不可用」），勿重复建键。
+    'Imagery on Esri · Google 3D returns when cleared':
+      '影像叠加在 Esri 底图上 · 清除后恢复 Google 3D',
+    'Press on the ground, not the sky': '请在地面上按下，而不是天空',
+    'Drag to size the box': '拖动以确定框选范围大小',
+    'Daily overview shows little detail in a box this small':
+      '框选范围这么小时，每日总览几乎没有细节',
+    'Imagery: NASA GIBS and Worldview · HLS (Sentinel-2, Landsat 8/9) and VIIRS':
+      '影像来源：NASA GIBS 与 Worldview · HLS（Sentinel-2、Landsat 8/9）及 VIIRS',
+    // 单行提示（hintText）——含快捷键符号与 ' · ' 分隔，整串建键最稳
+    'Zoom in or draw a smaller box': '放大镜头，或画一个更小的框',
+    'Select a box or use the view': '选择一个框，或使用当前视图',
+    'Searching the last 30 days': '正在搜索最近 30 天',
+    'No days to show for this box': '该范围内没有可显示的日期',
+    'Drag the divider · SWAP trades sides': '拖动分隔线 · SWAP 交换两侧',
+    '← → preview · A or B pins the focused day': '← → 预览 · A 或 B 固定当前聚焦的一天',
+    '← → preview the other side · A or B pins it': '← → 预览另一侧 · A 或 B 固定该侧',
+    'S on another day replaces it · × unpins': '在其他日期按 S 会替换固定 · × 取消固定',
+    '← → preview · S shows the focused day': '← → 预览 · S 显示当前聚焦的一天'
   };
+
+  /* 中文前缀 + 译文拼接：译文以中文开头时不补空格（否则是「正在切换到 调频」）。
+     RULES 里的规则函数要用，所以定义在 RULES 数组之前。 */
+  function joinZh(prefix, rest) {
+    var r = tr(rest);
+    return prefix + (/[一-鿿]/.test(r.charAt(0)) ? '' : ' ') + r;
+  }
 
   /* ---------- 动态串规则（正则 → 译文函数），更具体的放前面 ---------- */
   var RULES = [
@@ -713,7 +880,77 @@
     // 帧间隔量词：`30 min`（weather/index.js 的 maxGap、weatherPanel.js 的 gap）
     [/^(\d+) min$/, function (m) { return m[1] + ' 分钟'; }],
     // 气温标签的高度量词：`2 m`（'Air temperature · 2 m' 分段后的单段）
-    [/^(\d+) m$/, function (m) { return m[1] + ' 米'; }]
+    [/^(\d+) m$/, function (m) { return m[1] + ' 米'; }],
+
+    // ===== 本地 RTL-SDR / 近期影像动态串（2026-09-28 上游新增）=====
+    // 中文之间不加空格：译文按末字符判断是否需要分隔（'24 小时' 后接中文时不补空格）。
+    // joinZh 定义在 RULES 之外（数组字面量里放函数声明是语法错误）。
+    // SDR 接收器统计：`14 heard · 3.2 msg/s` / `12.5 msg/s`
+    // 捕获组必须过 tr()，否则留下 `3.2 msg/s` 半译（探针实测抓出）。
+    [/^(\d+) heard · (.+)$/, function (m) { return '收到 ' + m[1] + ' 架 · ' + tr(m[2]); }],
+    [/^(\d+) heard$/, function (m) { return '收到 ' + m[1] + ' 架'; }],
+    [/^([\d.]+) msg\/s$/, function (m) { return m[1] + ' 条/秒'; }],
+    [/^USB ([\d.]+) msg\/s$/, function (m) { return 'USB ' + m[1] + ' 条/秒'; }],
+    // 数据源聚合状态：`2 feeds live · 14 heard`（feed/feeds 单复数由上游拼好，中文不区分）
+    [/^(\d+) feeds? live · (.+)$/, function (m) { return m[1] + ' 路数据源在线 · ' + tr(m[2]); }],
+    // `feed 1090 stale` / `2 feeds adsb.lol, opensky unreachable`
+    // —— 上游格式是「feed(s) + 数据源名 + 状态」，数据源名保留原文。
+    // 注意别写成 ^(\d+) feeds?，否则单数形式 `feed 1090 stale` 会把 1090 当成数字前缀。
+    [/^feeds? (.+) (stale|unreachable|invalid)$/, function (m) {
+      var STATE = { stale: '已过期', unreachable: '不可达', invalid: '无效' };
+      return '数据源 ' + m[1] + ' ' + STATE[m[2]];
+    }],
+    // SDR 调频状态串：`Tuned to 98.5 MHz FM` / `FM signal found at 101.3 MHz`
+    [/^Tuned to ([\d.]+) MHz FM$/, function (m) { return '已调谐到 ' + m[1] + ' MHz 调频'; }],
+    [/^FM signal found at ([\d.]+) MHz$/, function (m) { return '在 ' + m[1] + ' MHz 发现调频信号'; }],
+    [/^Scanning ([\d.]+) MHz…$/, function (m) { return '正在扫描 ' + m[1] + ' MHz…'; }],
+    [/^Found ([\d.]+) MHz · ([\d.-]+) dB$/, function (m) { return '发现 ' + m[1] + ' MHz · ' + m[2] + ' dB'; }],
+    [/^Seeking (up|down)…?$/, function (m) { return (m[1] === 'up' ? '向上搜台…' : '向下搜台…'); }],
+    [/^Switching to (FM|ADS-B · 1090)$/, function (m) { return joinZh('正在切换到', m[1]); }],
+    // SDR 读数原子片段（statusText 用 ' · ' 拼接，逐段命中）
+    [/^([\d.]+) MS\/s IQ$/, function (m) { return m[1] + ' MS/s IQ'; }],
+    [/^DSP (\d+) blocks$/, function (m) { return 'DSP ' + m[1] + ' 个数据块'; }],
+    [/^DSP waiting$/, function () { return 'DSP 等待中'; }],
+    [/^RF (.+)$/, function (m) { return '射频 ' + m[1]; }],
+    [/^([-\d.]+) dBFS audio$/, function (m) { return '音频 ' + m[1] + ' dBFS'; }],
+    [/^audio signal --$/, function () { return '音频信号 --'; }],
+    [/^audio (idle|loading|buffering|playing|paused|stalled|error)$/, function (m) {
+      var S = { idle: '空闲', loading: '加载中', buffering: '缓冲中', playing: '播放中',
+        paused: '已暂停', stalled: '已卡住', error: '出错' };
+      return '音频' + (S[m[1]] || m[1]);
+    }],
+    [/^(\d+) messages$/, function (m) { return m[1] + ' 条报文'; }],
+    // 解码数据源摘要行：`Decoder feeds: 1090 · read while Local ADS-B is on`
+    // 捕获组必须过 tr()，否则 ' · ' 后半句留着英文（探针实测抓出的半译）。
+    // tr() 会把它交给 translateSegments 分段，后半句命中下面那条独立规则。
+    // 注意：不要再写 `/^ · read while.../` 这种带前导分隔符的规则 ——
+    // lookup() 开头会 trim，带前导空格的键永远匹配不上。
+    [/^Decoder feeds: (.+)$/, function (m) { return '解码数据源: ' + tr(m[1]); }],
+    [/^read while Local ADS-B is on$/, function () { return '本地 ADS-B 开启时读取'; }],
+
+    // 近期影像：天数计数 `5 DAYS` / `1 DAY`（上游用 DAY/DAYS 区分单复数）
+    [/^(\d+) DAYS?$/, function (m) { return m[1] + ' 天'; }],
+    // 影像日卡片 aria-label 的原子片段
+    [/^(\d+)% cloud$/, function (m) { return '云量 ' + m[1] + '%'; }],
+    [/^(\d+)–(\d+)% cloud$/, function (m) { return '云量 ' + m[1] + '–' + m[2] + '%'; }],
+    [/^start here$/, function () { return '建议首选'; }],
+    [/^shown$/, function () { return '已显示'; }],
+    [/^preview$/, function () { return '预览'; }],
+    [/^pinned$/, function () { return '已固定'; }],
+    // `Source off · ` 前缀（上游把它拼在传感器说明之前）
+    [/^Source off$/, function () { return '数据源已关闭'; }],
+    // 传感器说明：`Sentinel-2 · 30 m` / `Landsat 8/9 · 30 m`（产品名保留，量词段译出）
+    [/^(Sentinel-2|Landsat 8\/9|VIIRS)(?: via HLS)? · (\d+) m$/,
+      function (m) { return m[1] + ' · ' + m[2] + ' 米'; }],
+    // 空白日按钮：`SHOW EMPTY DAYS · 3`
+    [/^SHOW EMPTY DAYS · (\d+)$/, function (m) { return '显示空白日 · ' + m[1]; }],
+
+    // 火灾边界图层（src/layers/perimeters/cards.js）：`FIRE · Cedar Complex`
+    // 火场名是专有名词，保留原文；只译前缀。
+    [/^FIRE · (.+)$/, function (m) { return '火灾 · ' + m[1]; }],
+    [/^Unnamed incident$/, function () { return '未命名火场'; }],
+    [/^part of (.+)$/, function (m) { return '隶属 ' + m[1]; }],
+    [/^Open FIRE · (.+) on InciWeb$/, function (m) { return '在 InciWeb 打开「火灾 · ' + m[1] + '」'; }]
   ];
 
   /* 词典直查（不含分段/规则），供 RULES 内部复用 */
@@ -819,6 +1056,42 @@
     return out.join('\n');
   }
 
+  /* 上下文相关词：同一个串在不同容器里意思完全不同，纯文本匹配无法区分。
+
+     为什么不能靠大小写共存（技能里那套 'Clear'(清除) / 'CLEAR'(晴) 的办法）：
+     2026-09-28 上游新增「近期影像」面板后，它的清除按钮 label 是**全大写 CLEAR**
+     （src/ui/recentImagery.js，与 src/layers/directions/index.js 的 CLEAR 同款），
+     和驾驶舱气象读数 weatherCodeLabel() 返回的 CLEAR(晴) 大小写**完全一致**，
+     词典两个键会互相覆盖 —— 结果是清除按钮显示成「晴」，这是界面上看得见的错译。
+
+     判据改用容器类型：按钮类容器里的 CLEAR 是动作（清除），其余是状态（晴）。
+     - 气象读数挂在 <strong id="cockpit-local-condition">（cockpitController.js）
+     - 近期影像按钮带 data-action-id="clear"（railCardBlocks.js）
+     - 路径规划按钮带 data-chip-id="clear"（chipGroup.js）
+     以后上游再加同形词，往 CONTEXT_WORDS 里加一条即可，不要去改词典。 */
+  var CONTEXT_WORDS = {
+    'CLEAR': { action: '清除', other: '晴' }
+  };
+
+  function isActionContainer(el) {
+    if (!el || el.nodeType !== 1) return false;
+    var tag = el.tagName;
+    if (tag === 'BUTTON' || tag === 'A') return true;
+    var get = el.getAttribute;
+    if (typeof get !== 'function') return false;
+    if (get('data-action-id') || get('data-chip-id')) return true;
+    return get('role') === 'button';
+  }
+
+  /* 命中上下文相关词则按容器给译文；不是这类词返回 null，交回正常 lookup 流程。
+     返回与输入相同的串表示「译名即原文」，调用方据此不写入（幂等）。 */
+  function contextLookup(raw, el) {
+    var t = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+    var entry = CONTEXT_WORDS[t];
+    if (!entry) return null;
+    return isActionContainer(el) ? entry.action : entry.other;
+  }
+
   function lookup(raw) {
     var s = String(raw == null ? '' : raw);
     // 多行串优先按行拆分（必须在压平空白之前做）
@@ -885,6 +1158,13 @@
     if (node.nodeType === 3) {
       // 图标连字：父元素是 Material Symbols 容器就整段跳过
       if (node.parentNode && isIconNode(node.parentNode)) return;
+      // 上下文相关词优先于词典：CLEAR 在按钮里是「清除」、在气象读数里是「晴」，
+      // 两者大小写完全相同，只能按容器判（见 CONTEXT_WORDS 注释）。
+      var ctx = contextLookup(node.data, node.parentNode);
+      if (ctx !== null) {
+        if (ctx !== node.data) node.data = ctx;
+        return;
+      }
       var out = lookup(node.data);
       if (out !== null && out !== node.data) node.data = out;
       return;
@@ -895,7 +1175,11 @@
     if (node.hasAttribute && node.hasAttribute('data-gev-zh')) return;
     ['placeholder', 'title', 'aria-label', 'alt'].forEach(function (attr) {
       var v = node.getAttribute && node.getAttribute(attr);
-      if (v) { var o = lookup(v); if (o) node.setAttribute(attr, o); }
+      if (!v) return;
+      // 属性同样要过上下文消歧（按钮的 title/aria-label 里出现 CLEAR 时按动作译）
+      var o = contextLookup(v, node);
+      if (o === null) o = lookup(v);
+      if (o) node.setAttribute(attr, o);
     });
   }
 

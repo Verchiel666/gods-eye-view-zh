@@ -128,15 +128,26 @@ function decodeEntities(input) {
  *
  * 单词标签（Draw / Shape / Clear / Snow）同样必须覆盖——它们是按钮上的可见文案，
  * 漏译就是界面上明晃晃的英文。排除项：
- *   - 含 `.` 或 `_` 的标识符/域名（adsb.lol、feeds_osm 等数据源名，不译）
- *   - 纯数据（需含 2 个以上连续字母）
+ *   - **不含空白的**标识符/域名/文件名（adsb.lol、feeds_osm、vite.config 等数据源名，不译）
+ *   - 纯数值读数（`0.9 dB`、`87.5`、`24°` 等，无翻译价值）
+ *   - 需含 2 个以上连续字母（挡掉纯数据）
+ *
+ * ⚠ 曾经的盲区（2026-09-28 修正）：早期这里写的是 `if (/[._]/.test(t)) return false;`
+ * ——一刀切排除所有含点号的串，把**句号结尾的整句说明文案**也一起误杀了，
+ * 例如 `Connect an RTL-SDR to begin.`、`Initializing photorealistic world...`、
+ * `Search any location...`。这类文案是界面上大段可见文本，漏译最刺眼，
+ * 而门槛却一路假绿。改成「含点号 **且** 不含空白」才排除，只放过真正的标识符。
+ * 代价是要显式排除纯数值读数（`0.9 dB` 这类下拉选项会涌进来），故加了数值正则。
  */
 function isTranslatable(raw) {
   const t = raw.replace(/\s+/g, ' ').trim();
   if (t.length < 2) return false;
   if (/[一-鿿]/.test(t)) return false;
   if (!/[A-Za-z]{2}/.test(t)) return false;
-  if (/[._]/.test(t)) return false;
+  // 标识符 / 域名 / 文件名：adsb.lol、feeds_osm、vite.config —— 均不含空白
+  if (/[._]/.test(t) && !/\s/.test(t)) return false;
+  // 纯数值读数（含可选单位）：0.9 dB、87.5、108、24°
+  if (/^[\d.,\s]+(dB|km\/h|km|m|s|min|h|MHz|kt|°|%|m²)?$/i.test(t)) return false;
   return true;
 }
 
@@ -213,19 +224,27 @@ test('静态文案 100% 覆盖（同步上游后的覆盖率门槛）', () => {
   const { lookup } = loadPatch();
   const missing = [];
   let total = 0;
+  const all = new Set();
 
   for (const group of collectHtmlStrings()) {
     total += group.items.length;
     for (const text of group.items) {
+      all.add(text);
       if (lookup(text) === null) missing.push(`[${group.name}] ${JSON.stringify(text)}`);
     }
   }
 
   assert.ok(
-    total > 100,
+    total > 300,
     `静态文案提取异常：仅 ${total} 条。`
       + '上游可能又改了标记来源（index.html 现为壳，真实文案在 src/ui/templates/*.html，'
       + '经 build/application-html.js 的 expandApplicationHtml 展开），请同步更新 collectHtmlStrings()',
+  );
+  // 过滤规则自身的防回归：句号结尾的整句必须仍在提取范围内。
+  // 旧版 isTranslatable 用 /[._]/ 一刀切排除，把这类句子连带误杀过（门槛假绿）。
+  assert.ok(
+    all.has('Connect an RTL-SDR to begin.'),
+    'collectHtmlStrings 又把句号结尾的整句过滤掉了（isTranslatable 的点号排除过宽），门槛会假绿',
   );
   assert.deepEqual(
     missing,
@@ -409,6 +428,93 @@ test('气象/风场/气旋动态串（含多行 info）必须译出', () => {
   assert.deepEqual(failures, [], `气象三模块动态串回归（上游改了拼接方式或补丁的多行/量词处理坏了）：\n  ${failures.join('\n  ')}`);
 });
 
+test('SDR / 近期影像 / 赛博声呐动态串必须译出（2026-09-28 上游新增三模块）', () => {
+  const { lookup } = loadPatch();
+  // 下列用例全部来自 .workbuddy/probe-lookup.mjs 的实测输出，不是凭源码推测。
+  // 上游改拼接格式时本测试变红 —— 这类串在 JS 里现拼，静态门槛扫不到。
+  const cases = [
+    // 本地 ADS-B 接收器统计（src/layers/localAdsb/status.js）
+    ['14 heard · 3.2 msg/s', '收到 14 架 · 3.2 条/秒'],
+    ['14 heard', '收到 14 架'],
+    ['3.2 msg/s', '3.2 条/秒'],
+    ['2 feeds live · 14 heard', '2 路数据源在线 · 收到 14 架'],
+    ['2 feeds live · 14 heard · USB 5.8 msg/s', '2 路数据源在线 · 收到 14 架 · USB 5.8 条/秒'],
+    ['3 heard · USB 5.8 msg/s · feed 1090 stale', '收到 3 架 · USB 5.8 条/秒 · 数据源 1090 已过期'],
+    // describeFeedProblems 的真实格式是「feed(s) + 数据源名 + 状态」，**没有**数字前缀。
+    // 曾按想象写成 '1 feed adsb.lol stale' 被探针打回 —— 用例必须从源码抠。
+    ['feed 978 unreachable', '数据源 978 不可达'],
+    ['feeds 1090, 978 stale', '数据源 1090, 978 已过期'],
+    ['feed adsb.lol invalid', '数据源 adsb.lol 无效'],
+
+    // SDR 调频 / 搜台（src/sdr/controller.js）
+    ['Tuned to 98.5 MHz FM', '已调谐到 98.5 MHz 调频'],
+    ['FM signal found at 101.3 MHz', '在 101.3 MHz 发现调频信号'],
+    ['Scanning 98.5 MHz…', '正在扫描 98.5 MHz…'],
+    ['Found 101.3 MHz · 12.5 dB', '发现 101.3 MHz · 12.5 dB'],
+    ['Seeking up…', '向上搜台…'],
+    ['Seeking down…', '向下搜台…'],
+    // 中文前缀接中文时不补空格（否则是「正在切换到 调频」）
+    ['Switching to FM', '正在切换到调频'],
+    ['Switching to ADS-B · 1090', '正在切换到 ADS-B · 1090'],
+
+    // statusText 的 ' · ' 原子片段
+    ['DSP 48 blocks', 'DSP 48 个数据块'],
+    ['DSP waiting', 'DSP 等待中'],
+    ['RF -12.5 dBFS', '射频 -12.5 dBFS'],
+    ['-18.3 dBFS audio', '音频 -18.3 dBFS'],
+    ['audio signal --', '音频信号 --'],
+    ['audio playing', '音频播放中'],
+    ['audio buffering', '音频缓冲中'],
+    ['1204 messages', '1204 条报文'],
+    ['Decoder feeds: 1090 · read while Local ADS-B is on', '解码数据源: 1090 · 本地 ADS-B 开启时读取'],
+    ['waiting for IQ', '等待 IQ 数据'],
+    ['opening receiver', '正在打开接收器'],
+
+    // 近期影像（src/ui/recentImagery.js）
+    ['5 DAYS', '5 天'],
+    ['1 DAY', '1 天'],
+    ['32% cloud', '云量 32%'],
+    ['18–47% cloud', '云量 18–47%'],
+    ['SHOW EMPTY DAYS · 3', '显示空白日 · 3'],
+    ['Sentinel-2 · 30 m', 'Sentinel-2 · 30 米'],
+    ['Landsat 8/9 · 30 m', 'Landsat 8/9 · 30 米'],
+    // 影像日卡片 aria-label 是 ' · ' 复合串：日期/传感器保留，云量与推荐标记译出
+    [
+      '2026-09-28 · Sentinel-2 · 30 m · 32% cloud · start here',
+      '2026-09-28 · Sentinel-2 · 30 米 · 云量 32% · 建议首选',
+    ],
+
+    // 赛博声呐 GPU 降级提示（src/cyberSonarScene.js）
+    ['Contact GPU unavailable. Native contacts remain visible.', '目标 GPU 加速不可用，仍显示原生目标。'],
+
+    // 火灾边界（src/layers/perimeters/cards.js）：火场名是专有名词，只译前缀
+    ['FIRE · Cedar Complex', '火灾 · Cedar Complex'],
+    ['part of Cedar Complex', '隶属 Cedar Complex'],
+    ['Unnamed incident', '未命名火场'],
+  ];
+
+  const failures = cases
+    .filter(([input, expected]) => lookup(input) !== expected)
+    .map(([input, expected]) => `${JSON.stringify(input)} → ${JSON.stringify(lookup(input))}（期望 ${JSON.stringify(expected)}）`);
+  assert.deepEqual(failures, [], `以下动态串译文不符：\n  ${failures.join('\n  ')}`);
+
+  // 这三个模块的数据/专有名词仍必须保持原样（补丁不得介入）
+  const keep = ['0.9 dB', '49.6 dB', 'Sentinel-2', 'Landsat 8/9', 'VIIRS', 'adsb.lol',
+    'Cedar Complex', 'NASA GIBS', 'RTL-SDR', '2026-09-28', '1090', '12.5 dB'];
+  const wronglyTouched = keep.filter((t) => lookup(t) !== null);
+  assert.deepEqual(
+    wronglyTouched,
+    [],
+    `以下数据/专有名词被误译：${wronglyTouched.map((f) => `${JSON.stringify(f)} → ${JSON.stringify(lookup(f))}`).join(', ')}`,
+  );
+
+  // 幂等：译文回写后不得被二次改写
+  for (const settled of ['收到 14 架 · 3.2 条/秒', '数据源 978 不可达', '云量 32%',
+    '正在切换到调频', '音频播放中', '火灾 · Cedar Complex']) {
+    assert.equal(lookup(settled), null, `译文被二次改写：${JSON.stringify(settled)}`);
+  }
+});
+
 test('量词段翻译不得波及单位数据与既有距离显示', () => {
   const { lookup } = loadPatch();
   // translateSegments 现在让「纯数据段」也过一遍 lookup（为了让 '2 m' 能译成 '2 米'）。
@@ -576,6 +682,9 @@ test('Material Symbols 图标连字不得被翻译（译了图标就退化成方
     'radio', 'adjust', 'on', 'normal', 'draw', 'public', 'close',
     'flight', 'navigation', 'east', 'radar', 'bolt', 'flare',
     'light_mode', 'dark_mode', 'chevron_left', 'right_panel_open',
+    // 2026-09-28 本轮往词典加了 'TUNE'（SDR 调谐按钮），而 Material Symbols
+    // 恰好有 tune 图标；词典精确匹配优先 + DOM 容器拦截应确保图标不被误译。
+    'tune',
   ];
 
   for (const cls of ['material-symbols-outlined', 'pp-icon material-symbols-outlined',
@@ -601,6 +710,49 @@ test('Material Symbols 图标连字不得被翻译（译了图标就退化成方
   assert.equal(label.data, '手绘', '普通按钮文案 Draw 应被翻译（保护不得过宽）');
 
   assert.equal(lookup('radio'), '电台', '词典本身应仍能译出 radio（是 DOM 层拦的，不是词典删的）');
+});
+
+test('上下文相关词：CLEAR 在按钮里是「清除」、在气象读数里是「晴」', () => {
+  const { translateNode, lookup } = loadPatch();
+
+  // 2026-09-28 上游新增「近期影像」面板后，清除按钮 label 是全大写 CLEAR，
+  // 与驾驶舱气象读数 weatherCodeLabel(0) 返回的 CLEAR(晴) **大小写完全相同**，
+  // 词典层无法区分（两个键会互相覆盖）。只能按容器类型判：
+  // 按钮类容器 = 动作（清除），其余 = 状态（晴）。
+  // 这是界面上看得见的错译，必须守住，不能回退成纯文本匹配。
+
+  // 气象读数：<strong id="cockpit-local-condition">CLEAR</strong>
+  const condition = element('STRONG', { id: 'cockpit-local-condition' });
+  const conditionText = textNode('CLEAR', condition);
+  translateNode(conditionText);
+  assert.equal(conditionText.data, '晴', '气象读数里的 CLEAR 应译作「晴」');
+
+  // 近期影像清除按钮：railCardBlocks.js 渲染出 data-action-id="clear"
+  const actionBtn = element('BUTTON', { 'data-action-id': 'clear', type: 'button' });
+  const actionText = textNode('CLEAR', actionBtn);
+  translateNode(actionText);
+  assert.equal(actionText.data, '清除', '影像面板清除按钮应译作「清除」');
+
+  // 路径规划清除按钮：chipGroup.js 渲染出 data-chip-id="clear"
+  const chipBtn = element('BUTTON', { 'data-chip-id': 'clear' });
+  const chipText = textNode('CLEAR', chipBtn);
+  translateNode(chipText);
+  assert.equal(chipText.data, '清除', '路径规划清除按钮应译作「清除」');
+
+  // 手绘面板的 Clear（首字母大写）仍走词典，不受消歧影响
+  assert.equal(lookup('Clear'), '清除', "词典的 'Clear' 应仍译作「清除」");
+
+  // 幂等：消歧结果回写后不得被反复改写（译文「晴」不含 CLEAR，但要确认只写一次）
+  const again = textNode('CLEAR', condition);
+  translateNode(again);
+  translateNode(again);
+  translateNode(again);
+  assert.equal(again.writes, 1, `气象读数被写入 ${again.writes} 次（应为 1）`);
+
+  // 属性也要过消歧：按钮 title 里的 CLEAR 按动作译
+  const titledBtn = element('BUTTON', { 'data-action-id': 'clear', title: 'CLEAR' });
+  translateNode(titledBtn);
+  assert.equal(titledBtn.getAttribute('title'), '清除', '按钮 title 里的 CLEAR 应译作「清除」');
 });
 
 test('原生弹窗 hook：confirm / prompt / alert 文案被汉化', () => {

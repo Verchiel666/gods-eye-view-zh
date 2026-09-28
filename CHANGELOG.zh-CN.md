@@ -2,6 +2,47 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.4.0 — 2026-09-28
+
+同步上游 41 个提交（247 文件，+39137/-2569）后的一轮汉化补全。上游无冲突，汉化补丁文件独立。**本轮上游一口气落地了四个新功能模块——赛博 HUD 与 GPU 接触声呐（#706）、本地接收器体系：浏览器 RTL-SDR + 本地 ADS-B 图层 + 解码数据源（#732）、近期影像面板（#716）、火灾边界图层与 Active Fires 的 MODIS 数据（#737）**，外加赛博 HUD 的驾驶舱框线/扫描阵列视觉（纯 SVG，无文案）。
+
+### 新增
+
+- **赛博声呐**（`src/ui/cyberSonarControls.js`、`src/cyberSonar*.js`、`display-controls.html`）— HUD 布局新增第四个风格选项 `Cyber`(赛博)，以及五个滑杆：`Sonar`(声呐)、`Rings`(环数)、`Range`(范围)、`Power`(强度)、`Sector`(扇区)；GPU 不可用时的降级提示也一并译出。
+- **本地 RTL-SDR 接收器**（`src/sdr/controller.js`、`src/ui/localSdr*.js`、`context.html #sdr-radio-card`）— 整张卡片：`LOCAL RTL-SDR`/`NO USB`/`CONNECT`/`DISCONNECT`/`LOCATE`/`CHANGE DEVICE`、模式切换 `FM`(调频)/`ADS-B · 1090`、增益 `GAIN`/`AUTO`、统计行 `MSG/S`(条/秒)/`HEARD`(已收到)/`POSITIONED`(已定位)/`IQ`、`FM MHZ`/`TUNE`/`◀ SEEK`/`SEEK ▶`/`SDR VOL`，以及全部状态串（`STREAMING`/`CONNECTING`/`TUNING`/`IDLE`、调谐与搜台消息、`DSP n blocks`、`RF ...`、`audio ...`）和本地 ADS-B 的数据源聚合状态（`2 feeds live · 14 heard`、`feed 978 unreachable`）。
+- **近期影像面板**（`src/ui/recentImagery.js`、`imageryBoxTool.js`、`imagerySplit.js`、`context.html #recent-imagery-panel`）— 面板壳 `RECENT IMAGERY`、模式 `IMAGE`/`VS BASEMAP`/`A / B`、动作按钮 `SELECT BOX`/`USE VIEW`/`CLEAR`/`SWAP`/`EXPORT`/`START HERE`/`PREVIEW`/`ZOOM IN`、云量读数 `32% cloud`、天数计数 `5 DAYS`、七条快捷键提示（`← → preview · A or B pins ...`）、框选工具引导（`Press on the ground, not the sky`）与数据源署名。
+- **火灾边界图层**（`src/layers/perimeters/cards.js`）— 卡片标题 `FIRE · Cedar Complex`（火场名为专有名词，保留原文只译前缀）、`part of ...`、`Unnamed incident`、InciWeb 外链的无障碍标签。
+- 词典从 634 条扩充到 **766 条**，动态串规则 81 → **117 条**。
+
+### 修复（三处，其中一处是界面上看得见的错译）
+
+- **`CLEAR` 撞车导致清除按钮显示成「晴」** — 这是本轮最要紧的一条，而且**在合并前就已经存在于线上**：2026-09-23 那轮为气象读数加了 `'CLEAR': '晴'`，而本轮上游新增的近期影像面板和既有的路径规划面板，它们的清除按钮 label 都是**全大写 `CLEAR`**，与气象状态词大小写**完全一致**。
+  - 以前那套「靠大小写共存」的办法（`'Clear'`=清除 / `'CLEAR'`=晴，见 zh-1.2.0）在这里彻底失效：词典两个键会互相覆盖，结果是按钮上明晃晃显示「晴」。
+  - 改为**按 DOM 容器类型消歧**：新增 `CONTEXT_WORDS` 表与 `contextLookup()`，在 `translateNode` 的文本节点分支和属性分支**优先于词典**判定——按钮类容器（`<button>`/`<a>`/`role=button`/带 `data-action-id`/`data-chip-id`）里的 `CLEAR` 译作「清除」，其余（如 `<strong id="cockpit-local-condition">`）译作「晴」。
+  - 以后上游再加同形词，往 `CONTEXT_WORDS` 加一条即可，**不要去改词典**（改了就是又一次互相覆盖）。
+- **覆盖率门槛自己有个「句号盲区」** — `isTranslatable()` 用 `if (/[._]/.test(t)) return false` 排除标识符（`adsb.lol`、`feeds_osm`），但这是**一刀切**：凡是含点号的串全部排除，于是**句号结尾的整句说明文案**被连带误杀，例如 `Connect an RTL-SDR to begin.`、`Initializing photorealistic world...`、`Search any location...`、`Imagery on Esri · Google 3D returns when cleared`。这些都是界面上大段可见文本，漏译最刺眼，而门槛一路**假绿**。
+  - 改成「含点号 **且** 不含空白」才排除，只放过真正的标识符/域名；同时显式排除纯数值读数（`0.9 dB` 这类增益下拉选项会涌进来）。提取条数从 322 → **386**，多出的 22 条句号结尾整句里，大部分是此前一直漏在门槛之外的既有文案（视觉风格 tooltip、密钥配置说明、`Initializing photorealistic world...`、`Search any location...` 等），少数来自本轮新增的 SDR 卡片说明段。
+  - 条数下限断言从 `> 100` 提到 `> 300`，并**新增一条针对过滤规则本身的防回归断言**（断言 `Connect an RTL-SDR to begin.` 必须在提取范围内），报错信息直接写明「又把句号结尾的整句过滤掉了，门槛会假绿」。
+- **探针抓出 6 处半译与多余空格** — `14 heard · 3.2 msg/s` 译成「收到 14 架 · 3.2 msg/s」（捕获组没过 `tr()`）、`Switching to FM` 译成「正在切换到 调频」（中文之间多补空格）、`feed 1090 invalid · 5 heard` 整块失效（规则把 `feed` 后的名字误当数字前缀）等。新增 `joinZh()` 处理中文前缀拼接，并把数据源问题串的正则改成上游真实格式。
+
+### 门槛强化
+
+- 新增测试 **`SDR / 近期影像 / 赛博声呐动态串必须译出`** — 固化 40 条真实动态串。这三个模块的文案几乎全是 JS 里现拼的（`localSdrPresentation.js` 的 `statusText()`、`recentImagery.js` 的 `countText()`/`cloudText()`/`hintText()`、`localAdsb/status.js` 的 `describeFeedProblems()`），**静态 HTML 门槛扫不到**，不单独设门槛就没有任何信号。同一道测试里还守住「数据/专有名词必须原样」（`0.9 dB`、`Sentinel-2`、`adsb.lol`、`Cedar Complex`、`1090` 等 12 条）与「译文不得被二次改写」（幂等）。
+- 新增测试 **`上下文相关词：CLEAR 在按钮里是「清除」、在气象读数里是「晴」`** — 覆盖四种容器（气象 `<strong>`、`data-action-id` 按钮、`data-chip-id` 按钮、按钮 `title` 属性），并断言幂等（连扫 3 轮只写 1 次）。
+- **三处修复都做了反向验证**（不是只看绿灯）：禁用 `contextLookup` → CLEAR 测试精确报红；把 `isTranslatable` 改回旧的一刀切 → 句号盲区断言报红并指出「门槛会假绿」；把 `^(\d+) heard$` 规则改成返回 `null` → 动态串测试报红。恢复后 18/18 全绿。
+- 汉化门槛测试从 16 例增至 **18 例**，静态文案覆盖 **386/386 = 100%**。
+- 图标连字清单补 `tune`：本轮往词典加了 `'TUNE'`（SDR 调谐按钮），而 Material Symbols 恰好有 `tune` 图标。保护靠 DOM 容器拦截而非黑名单，测试清单补上这个词只是让「词典里存在图标同名词」这件事有断言守着。上游本轮模板唯一新增的连字是 `radar`，早已在清单内。
+
+### 排错教训
+
+- **用例必须从上游源码里抠，别凭想象编。** 我最初把数据源问题串写成 `1 feed adsb.lol stale`、`2 feeds adsb.lol, opensky unreachable`（带数字前缀），探针报「未译」；去读 `describeFeedProblems()` 才发现真实格式是 `feed 978 unreachable` / `feeds 1090, 978 stale`（**没有**数字前缀），是正则写错而非用例写错。改对用例后一次通过。这条纪律在 zh-1.3.0 也踩过，值得再记一次。
+- **规则里带前导分隔符的键永远匹配不上。** 曾写过 `/^ · read while Local ADS-B is on$/`，但 `lookup()` 开头会 `trim()`，这条规则永远进不去。已删掉并在注释里写明原因。
+
+### 验证
+
+- 汉化门槛 **18/18 全绿**；完整测试套件 **5108 / 5098 通过 / 0 失败 / 10 跳过**；`npm run build` 通过（50s）；`check:boundaries` 通过。
+- **依赖有漂移，已 `npm install`**：`package-lock.json` 变更（硬信号），上游新增 `@jtarrio/signals@^0.10.0` 与 `@jtarrio/webrtlsdr@^3.0.6`（本地 RTL-SDR 的 WebUSB 驱动与解码），另带入 `@types/w3c-web-usb`。不装的话本地构建/测试会因缺模块失败。
+
 ## zh-1.3.0 — 2026-09-23
 
 同步上游 17 个提交（198 文件，+31641/-1852）后的一轮汉化补全。上游无冲突，汉化补丁文件独立。**本轮上游新增了三个全新图层模块——气象影像（`src/layers/weather/`）、风场（`src/layers/wind/`）、热带气旋（`src/layers/cyclones/`），以及配套的读数面板体系（`src/ui/weatherPanel.js`、`railCards.js`、`railTimeline.js`、`chipGroup.js`）**，文案量远超前几轮。
