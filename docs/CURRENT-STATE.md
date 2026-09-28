@@ -1,5 +1,42 @@
 # God's Eye View Current State
 
+## Cyber HUD — September 23, 2026
+
+Display > HUD > Layout includes Cyber, also available through the HUD voice
+action and shared visual state. An explicit first transition into Cyber selects
+FLIR with Ironbow 0.42; restored links and subsequent visual tuning remain
+authoritative. The skin uses shared red/slate panel treatments in map and cockpit,
+with compact 200px collapsed controls and wider expanded panels. Other HUD
+layouts retain their existing presentation.
+Chamfered panel expand/collapse controls use an inset keyboard-focus outline and
+red hover border in both map and cockpit, so clipping does not hide the highlight.
+
+Cyber's map-side right rail opens one panel at a time while keeping collapsed
+launchers available. Display, CCTV and Context scroll their contents inside fixed
+headers and decorative frames. The narrow-screen rail remains scrollable to reach
+each panel. Radio retains the shared nested Context player and compact
+header disclosure, without relocating playback controls on theme changes.
+
+Sonar has one contact-highlighting method. Native Cesium points, billboards and
+labels are treated in GPU draw commands without replacing their positions,
+identities or pick commands. Model and canvas/DOM overlays retain their own
+rendering paths. Sonar OFF stops the sweep while retaining Cyber's neutral
+contact treatment. Reduced motion disables the animated sweep; cockpit and
+hidden HUD states do not apply the map treatment. If the native shader is not
+supported, native contacts remain available and Display reports the limitation.
+No CSS scene-dimming fallback or effect selector is exposed.
+
+The Sonar controls adjust rings, range, power, opacity and sector. Sweep opacity
+affects detection painting rather than label cohort admission. Theme exit and
+renderer teardown release the derived GPU resources and restore owned model
+colors without replacing newer layer-owned color changes.
+
+The `set_cyber_sonar` voice action adjusts the same controls without switching
+themes or enabling omitted settings. State readback distinguishes configured
+settings from active map/contact effects. Sonar settings are session-only and
+return to their defaults on reload. Sliders accept integer values matching the
+action's ranges.
+
 Wind appears in the Weather group before Utilities. The surface-weather prototype
 uses keyless NOAA GFS or ECMWF IFS forecasts on an approximately 1° display grid.
 It defaults to 10 m wind trails over the existing basemap. Speed shading is an explicit choice; earlier v2 links retain their original speed-shading meaning.
@@ -664,6 +701,25 @@ snapshots, lifecycle actions and row descriptors. Remount and teardown remove
 listeners and row subscriptions; obsolete completions do not repaint old rows.
 The clear control presents busy state while its existing action owns the transaction.
 
+## Model atmosphere on Apple Metal
+
+Cesium's per-vertex model atmosphere is kept out of the pipeline on devices
+whose driver cannot link it. `AtmosphereStageVS` binds shader `out` parameters
+directly to varyings, which ANGLE's Metal backend rejects at link time, tearing
+down the render loop on iPadOS and iOS. `ModelSceneGraph.configurePipeline`
+attaches that stage only when `fog.enabled && fog.renderable`, so the viewer
+clears `scene.fog.renderable` and leaves `fog.enabled` — and the fog density
+that drives 3D Tiles screen-space-error scaling — intact. Sky atmosphere and the
+ground-atmosphere fragment path route through locals and are unaffected.
+Affected devices lose distance fog on 3D tiles and on globe basemaps (Esri,
+Bing, keyless), since the globe fog shader uses the same `renderable` flag.
+The probe releases its throwaway WebGL2 context immediately.
+
+Detection is a WebGL2 link probe of the same out-parameter/varying pattern, so a
+future driver fix restores the effect with no code change; iOS/iPadOS platform
+detection is the backstop for when no probe context can be created. Applied
+during viewer construction, before any tile builds a draw command.
+
 ## Map Source control ownership
 
 Map Source controls own chip listeners, source-state subscriptions and selection
@@ -757,10 +813,12 @@ their `configured: false` response.
 
 CCTV media waits at most 15 seconds for upstream response headers and returns
 504 on timeout. Its timer stops when headers arrive, so live bodies can continue
-streaming; body idle deadlines are separate from this header deadline. Error
-responses are cancelled. Buffered snapshots have a 16 MiB streaming cap; an
-oversized image remains an upstream miss and uses the normal fallback chain.
-The existing declared media size ceiling remains 64 MiB.
+streaming; a separate 30-second idle deadline then bounds the gap between
+upstream chunks and releases a body that has gone silent. A response that is
+still waiting to drain reschedules that deadline, so a slow client does not read
+as a stalled upstream. Error responses are cancelled. Buffered snapshots have a
+16 MiB streaming cap; an oversized image remains an upstream miss and uses the
+normal fallback chain. The existing declared media size ceiling remains 64 MiB.
 
 ## GBFS upstream bounds
 
@@ -820,6 +878,22 @@ and stale/error responses remain unchanged. Each has a Node-only package entry
 under `gods-eye-view/server/providers/`. Portable terrain mechanics, traffic tile
 math and GBFS source rules are available under `gods-eye-view/sources/`.
 The browser layers and their rendering remain in their existing modules.
+
+## Terrain height cache bound
+
+The client terrain-height resolver's in-memory cache is bounded at 20 000
+entries (`DEFAULT_MAX_CACHE_ENTRIES`, overridable per instance through
+`createTerrainHeights({ maxCacheEntries })`). Coordinate rounding makes repeated
+visits to one place share a key but does not bound how many distinct places a
+session visits, and the cache previously had no eviction, so a long session
+retained every coordinate it ever resolved. Eviction is least-recently-used:
+a consumer read promotes its entry, so the cell being watched is not dropped for
+having been resolved early. The bound sits far above a city-scale session, so
+normal use never evicts and issues no additional proxy requests. A batch's
+results are assembled from what that call resolved, so eviction during a large
+batch cannot report a just-resolved point as unresolved. Re:Earth and
+geoid-fallback entry semantics, the fallback cooldown and the abort-time flush
+are unchanged.
 
 ## Landmark annotation identity
 
@@ -1013,7 +1087,7 @@ Non-object or array-valued properties reject the response instead of being treat
 
 Launch payloads with missing records now say PAYLOAD DATA UNAVAILABLE. Missing names use Unnamed payload; absent or invalid mass stays unknown instead of appearing as 0 KG.
 
-Updated: September 15, 2026
+Updated: September 23, 2026
 
 ## Aircraft and vessel server modules
 
@@ -1149,7 +1223,7 @@ fetching, trailing-24-hour filtering and partial-success caching are unchanged.
 > rule by a unit pin), and session-dismisses rather than contesting the key; if
 > one is already up at init it **waits** instead of appearing over it. (2) A
 > surface can take the screen with **no class to watch** — the Cesium attribution
-> lightbox is full-screen at `z-index: 200` against the card's `175`, which left
+> lightbox is at `z-index: 200` against the card's `175`, which left
 > the launcher measurable (`getClientRects()` non-empty) and buried, so ESC
 > dismissed a card nobody could see and burned the session flag. `isTopmost()`
 > therefore also **hit-tests the card's own centre** with `elementFromPoint`; any
@@ -1961,7 +2035,7 @@ down | auth-failed` (plus the unchanged `missing-key`/`unsupported`) with
 > - **Compact data-attribution panel:** the complete Cesium credit inventory
 >   remains available without taking over the viewport. Its expanded desktop
 >   panel is capped at 70dvh/36rem, the wrapped 12px credit list scrolls inside
->   it, and narrow screens retain Cesium's full-screen surface with an internal
+>   it, and narrow screens retain Cesium's surface with an internal
 >   scroller. The title, close control, links, and persistent Google/Cesium line
 >   remain unchanged and visible.
 > - **Distant-aircraft recession:** both civilian and military billboard fleets
@@ -2691,8 +2765,11 @@ its criteria cannot be silently ignored.
 | Datacenters ▣          | OSM extract (bundled)                                                                                                                                                                           | `src/data/localLayers.js`                             | —                                                        | static                                                                            |
 | Dams ▰                 | OpenInfraMap/OSM extract (bundled)                                                                                                                                                              | `src/data/localLayers.js`                             | —                                                        | static                                                                            |
 | Submarine Cables ◠     | TeleGeography public map (bundled)                                                                                                                                                              | `src/data/telegeographySubmarineCables.js`            | —                                                        | static                                                                            |
-| FIRMS Active Fires ▲   | NASA FIRMS live (VIIRS ×3 NRT, trailing 24h)                                                                                                                                                    | `src/data/firmsHeatmap.js`                            | `/api/firms` (`FIRMS_MAP_KEY`)                           | 10 min (proxy TTL 30 min)                                                         |
+| FIRMS Active Fires ▲   | NASA FIRMS live (VIIRS ×3 NRT + MODIS NRT, trailing 24h)                                                                                                                                        | `src/data/firmsHeatmap.js`                            | `/api/firms` (`FIRMS_MAP_KEY`)                           | 10 min (proxy TTL 30 min)                                                         |
 | Wind 🌬                 | NOAA GFS 10 m wind (keyless, 0.25°→1° grid; animated particles)                                                                                                                                 | `src/data/wind.js`                                    | `/api/wind`                                              | 1 h (forecast cycle)                                                              |
+| Fire Perimeters 🔥 | NIFC WFIGS current interagency perimeters (keyless, paged past the 2000-record cap); InciWeb catalog + incident page origin and update time checks for verified incident-page links | `src/layers/perimeters/` via `src/app/layers/perimeters.js` | `/api/fire-perimeters` + `/api/fire-perimeters/inciweb/*` | 5 min (server caches: catalog 1 h; publication 30 min) |
+
+Fire Perimeters uses capped, timed server reads with stale-on-error caching and a per-client limit. Unchanged snapshots retain geometry; link checks cancel on disable or selection change, and the row legend shows reported containment.
 
 Directions is a keyless front end to the routing the voice agent already
 uses. Its row chips are the whole interface: DRIVE / WALK / BIKE pick the
@@ -3307,6 +3384,12 @@ silently demoting every later lookup for the session.
 - **The DENSE chip reports the dense LOAD, not the catalog param.** The param flips synchronously while the Starlink shell takes seconds to arrive over a chunked load, and CelesTrak 502s that feed regularly. So the chip reads `DENSE ···` (busy, disabled) while loading, ACTIVE only once dense points are actually on screen, and `DENSE ✕` with the reason on hover when the load fails — a failure also reverts `catalog` to `core`, drops any partial chunk, and leaves the chip clickable to retry. A load is judged by points added, not by HTTP status: a 200 carrying an empty body, a passed-through HTML error page, or only TLEs the core catalog already owns fails with the same revert semantics as a 502. Any explicit request for `core` clears a latched error even when the mode does not change, so a Space Missions restore of an already-core snapshot never leaves the user with a failure they did not cause. Because the load settles asynchronously, the layer pushes a re-render through the optional `setRowControlsListener()` hook; nothing else would repaint that row before the 5-minute catalog refresh, so the count and legend would otherwise sit stale.
 - **A dependency owner takes the row with it.** Space Missions borrows this layer for TLE lookup with `showPoints:false`; while points are hidden the layer returns empty row controls, so the legend never describes an empty sky and the chip cannot accept a write that the owner's restore would silently revert.
 - The detection-overlay record cache (`_detectionObjects`) is cleared with the catalog on every rebuild: it stamps id/class at creation only, and a rebuild can re-tag a satellite when a partial CelesTrak outage changes which group wins dedupe.
+- **CCTV estimated bearings:** a camera whose pack marks `headingConfidence: 'low'` (the id-hash
+  `fallbackHeadingFromId` bearing) shows `HDG n° (ESTIMATED)` in the HUD and draws its coverage
+  wireframe dashed; colours, widths and active/idle emphasis are unchanged. A manual calibration
+  (`calSource: 'manual'`) or curated pose (`poseSource: 'curated'`) is never presented as
+  estimated, matching the CAL badge. Public camera state carries `headingConfidence` and
+  `headingEstimated` (`src/layers/cctv/headingConfidence.js`, #639).
 - **FIRMS**: no ground clamping (zero 3D-tiles height sampling), ≤18 screen-decluttered ambient labels, click-to-inspect detail card, 2.5k/3k sprite budgets viewport-clipped by FRP.
 - **CCTV v2 foundation:** a pitched
   frustum wireframe (4 corner rays + far-cap rectangle) with a monitor plane at the frustum's
@@ -3406,6 +3489,7 @@ silently demoting every later lookup for the session.
 - HTTP refusals such as 406 now rotate alongside the existing network, rate-limit, and runtime-error cases. A refusal from one mirror no longer prevents reaching healthy alternatives or persists under the seven-day road/month-long boundary cache TTLs. Concurrent identical queries share one mirror sequence; if it fails, both the initiating and joined callers can use the same last-good data.
 - A refusal every mirror agrees on is still reported with the first mirror's status and body, so a genuinely malformed query says what upstream said — but only after every mirror has had the chance to answer it. `fetchOverpassPayload` takes injectable endpoints and fetch so the rotation is tested without a live mirror (`src/overpassProxy.test.mjs`).
 - Every mirror is asked with a User-Agent that names the application, its version and the project address (`OVERPASS_USER_AGENT` in `server/providers/overpass/constants.js`), which is what the OSM API usage policy asks for. Mirrors may refuse a client they cannot identify; such a refusal is never treated as data and costs the fan-out that mirror, so the header is what keeps the list at full strength.
+- When the fan-out has nothing left to offer, the traffic row says which upstream declined and how: `Overpass rate-limited`, `Overpass timed out`, or `Overpass refused the road query (HTTP 406)`; the proxy's own 502 (every mirror unreachable) and 503 (local limiter busy) read `Overpass mirrors unreachable` and `Overpass temporarily unavailable`. Street Traffic draws on two upstreams — OpenStreetMap for geometry, TomTom for flow — so a row that only said "road data unavailable" sent readers to check a TomTom key that was never the problem (#661). `roadRequestError` in `src/layers/traffic/source.js` owns the mapping and tags the error with its status. A refusal whose code is unreadable — the layer takes its source by injection, so an adapter may not supply one — reports `Overpass temporarily unavailable` rather than printing `HTTP undefined`, and anything the layer did not classify at all (a dropped connection, a malformed snapshot) still reads `Road data temporarily unavailable`, because a platform exception is not a sentence to put on a panel.
 
 ### Share-link v2 layer state (August 2026)
 
@@ -3414,11 +3498,33 @@ silently demoting every later lookup for the session.
   with compact fields for enabled layers, allowlisted layer options, panel state,
   and the active preset's allowlisted shader controls. An absent layer field uses
   deterministic defaults; an explicit empty field means no enabled layers.
-- The registry seals only after all 16 production layers register, and every
-  layer has an explicit serialization disposition. Unknown enabled-layer tokens
-  reject the layer payload; unknown option tokens are ignored. Restoration
+- The registry seals only after every production layer registers, and every
+  layer has an explicit serialization disposition. Unknown, empty, or repeated
+  enabled-layer tokens reject the whole layer payload (`l=` alone is the valid
+  explicit-empty form); unknown option tokens are ignored. Restoration
   settles independently per layer so one failed or unavailable source cannot
   block its siblings.
+- Layer tokens are permanent public compatibility identifiers. The reservation
+  JSON ledger at `src/data/layerStateTokenReservations.json` pins all existing
+  one-character assignments (all letters plus `1` and
+  `2` on current `main`) even if a layer is later removed. New layers allocate
+  the remaining unreserved single-character digits first (`0`, then `3`
+  through `9` on current `main`), then the next unreserved two-character
+  base-36 token (`00` through `zz`) after rebasing onto the merge-time `main`;
+  the dot-delimited v2 codec accepts both widths without changing existing
+  links or the schema version. The contributor
+  check reads the complete published JSON ledger from `origin/main`, including
+  retired reservations, so later assignments cannot silently replace published
+  ones. The pre-ledger base is accepted only at its known source blob; unknown
+  historical shapes fail closed.
+  Pull-request CI runs this check against `origin/main`.
+- `scripts/qa-layer-token-twochar.mjs` simulates exhaustion of the earlier
+  digit slots and injects a no-network `00` layer only into isolated dev-browser
+  responses. It proves encoding, a cold-recipient reload, restoration, explicit
+  OFF, and legacy-token compatibility. This is synthetic
+  end-to-end evidence, not production allocation: `00` remains unreserved until
+  the first eligible real layer receives it after the free digits through the
+  normal allocation process and passes its own application share/reload check.
 - Stable visible options are limited to aircraft 3D mode, selected civilian and
   military flight IDs, Satellite catalog and selection, CCTV coverage/projection/
   auto-hop, and Radio filter/volume. Playback and tuning, live-data health,
@@ -3654,6 +3760,18 @@ are omitted rather than framing the wrong part of the globe.
 - **Enter belongs to whatever has the keyboard.** The finish key is taken only from the canvas, the page body and the tool's own label field. With a control focused — Clear, a shape button — Enter activates that control, as a keyboard user expects; it does not quietly finish the shape.
 - Pure half: `src/annotations/drawMode.js` (session, minimum vertices, double-click de-dup at 0.5 m, vertex ceiling, degenerate-geometry refusal, ring closing, dateline-safe length/area/centroid, hint text). Regression surface: `src/annotations/drawMode.test.mjs` and `src/data/inputOwnership.test.mjs` (pure), `src/annotations/drawToolBehaviour.test.mjs` (the tool driven against DOM and viewer doubles — leases, borrowed input actions, teardown, the Enter key, preview heights), `src/annotations/drawTool.test.mjs` (structural: where files live, which ids the markup carries, what the docs may claim), and the rendered harness `scripts/qa-draw-tool.mjs`.
 - The annotation tree is a declared ownership group: `./annotations` → `src/annotations/index.js` in `package.json`, with its module graph listed in `scripts/package-boundaries.json`, so an annotation module reaching outside that graph is a gate failure rather than a surprise in a layer's bundle. `drawMode.js`, `drawTool.js` and their tests are in `scripts/format-scope.json`.
+
+### Recent Imagery (September 2026)
+
+- The layer sits in the Data Layers panel's Cameras group beside Cameras (CCTV); Mapped ALPR Cameras moved to the Infrastructure group to make room.
+- DATA ▸ **Recent Imagery** (`recent-imagery`, `src/layers/recentImagery/`) lists the last 30 UTC days of imagery for a selected box and drapes the days you pick: HLS S30 (Sentinel-2) and L30 (Landsat 8/9) at 30 m, and the VIIRS NOAA-21 daily overview at 250 m. Keyless and browser-direct: NASA CMR for which days have HLS granules in the box (`catalog.js`, both collections concurrently, paged with `CMR-Search-After` up to 2,000 records each, `truncated` against CMR `hits`), GIBS WMTS for tiles, Worldview Snapshots for thumbnails and exports. Worldview's `Data-Present` header is the only availability signal: GIBS answers an empty tile with HTTP 200, and the JPEG overview would drape black, so a day confirmed empty never drapes.
+- **Box.** SELECT BOX (`src/ui/imageryBoxTool.js`) claims the pointer like Draw, borrows the stock click actions and freezes the camera only mid-drag; USE VIEW takes the camera rectangle; `boxFromPinAt` grows a 10 km box. Boxes must be ≤ 1,000 km a side, on one side of the dateline and inside the Web-Mercator limit (`validateBox`). A refusal (`boxError`, including the tool's own via `reportBoxRefusal`) stays at the top of the panel until a box succeeds; a view over the cap is refused with its size, never shrunk. An oversized box or view (`Box is … km wide · limit 1,000 km`, `View is … wide · …`) sets the hint to `Zoom in or draw a smaller box` and enables ZOOM IN: `zoomToFit()` flies top-down (1.2 s) to the refused box's centre, or the ground under the canvas centre for a view, at the height whose view is about 400 km wide for the canvas aspect and the camera's vertical FOV (`fitViewHeightM`, clamped 5–400 km), and returns that height.
+- **Modes, pins and the preview.** The mode is explicit: `image` (one pinned day, slot `a`), `basemap` (that day on the left of a swipe, the basemap on the right: slot `a` splits LEFT and there is no second layer) and `ab` (day `a` left, day `b` right). `setAssignment(slot, key | null)` / `toggleAssignment(slot, key)` pin and unpin; a day is in one slot at most (pinning it in the other slot moves it) and an empty day cannot be pinned. `setMode()` keeps both pins; `b` only drapes in `ab`. While the mode's first empty slot exists the focused day previews in it: a click at once, arrow keys after 250 ms of quiet (`FOCUS_DEBOUNCE_MS`, one timer, last day wins); an unprobed day is followed and previews when its probe says present, an empty or unknown day never drapes and the previous preview stays. A pin change drops the preview until focus moves again, and unpinning takes that layer off at once. `rankLatest` picks START HERE coverage first (a present HLS day whose footprints cover the box, or have none, beats a newer sliver), then newest with all granules ≤ 20% known cloud, then newest; slivers only as `partial`; else the newest non-empty VIIRS day; it is focused and previewed after each search when nothing is pinned. Escape clears the preview (`clearPreview()`), then cancels the box tool, then blurs — with SELECT BOX armed too, through the tool's `onEscape` interceptor wired in `createApplicationTools`. Pins, mode, box and split changes made in the panel are published with `adoptLayerParams`, never while a share link is being applied.
+- **Rendering.** `rendering.js` owns at most two GIBS layers on the host `src/maps/imageryHost.js` resolves: `viewer.imageryLayers` while the globe shows, the photoreal tileset's `imageryLayers` while it is hidden, or none (the panel says so). Layers are rebuilt on a new host, never re-parented. `MapSourceController.subscribe()` fires after every settled stack switch (silent switches and fallbacks included) and the layer rebinds on it. Tile requests pass a six-slot semaphore of our own (Cesium's global limits are untouched). Under `requestRenderMode` a deferred tile needs a later frame, but a deferral must never request one itself or a stalled tile keeps the scene rendering every frame: a request that finds the semaphore full asks for nothing (the settling request asks for one frame), and a tile Cesium itself deferred goes through one coalesced 250 ms retry. Thumbnails: three fetches at once, sixteen decoded images, least-recently-used where a `get` read is never a use; eviction keeps the probe result. The strip's visible window is probed around the focused card; the pinned and previewed days are probed wherever they sit, at the focused card's priority, so a pin restored or assigned off-screen still drapes.
+- **Esri surface and the swipe.** While any image is on the map (a preview included) the layer holds the map lease (`acquireImageryComparison`, owner `recent-imagery`, `esri-if-photoreal`): on Google 3D the map switches to Esri, because 30 m pixels over 3D buildings do not read, and Cesium's split only works on the globe. The lease is handed back, and Google 3D restored unless the operator changed maps meanwhile, when the last image leaves the map or the layer is disabled; the notice line says so while it holds. While a day is shown the imagery keeps Esri: a manual switch that lands on Google 3D is answered at once with a new lease under the same policy (`keepEsri`), the notice reads `Imagery stays on Esri · CLEAR to use Google 3D`, and the divider never suspends because of a map switch. It re-leases once per switch generation and only for a manual one (`MapSourceController#getSwitchOrigin()` is `manual` for an outside `setStack`, `automatic` for the controller's own fallback or recovery), never for the lease's own switch and never while releasing, so CLEAR and disable still return to Google 3D; a lease another owner holds stays refused. When Esri fails and the controller falls back to Google 3D on its own, the layer lets the lease go without restoring anything, both days drape on the tileset without a swipe and the guidance reads `Esri map unavailable · no swipe`; only the next manual switch to Google 3D takes Esri again, so a failing Esri map is never retried in a loop. Switching between globe stacks (Esri, OSM, Bing) only rebinds. On a tileset host both images drape without a swipe. The split control (`createImagerySplit`, labels A / B, or IMAGE / BASEMAP) exists only while a swipe is live, recentres on every new comparison (not while scrubbing the second day), except once for a split restored from a link. There is no keyboard shortcut (Space is the app's push-to-talk): SWAP (`#ri-swap`, in the controls row, its slot reserved and the button disabled while no swipe is live) trades the two sides, A to the right and B to the left, or the image to the right of the basemap, and a second click restores; the hint reads `Drag the divider · SWAP trades sides`. The swap is not in the share link, and every new comparison starts unswapped. One opacity applies to both drapes. Another owner holding the lease is reported and the images still drape.
+- **Panel.** `#recent-imagery-panel` is static rail markup in `src/ui/templates/context.html` beside `#weather-panel`, registered in `PanelLayoutController`, `PanelChrome` and the share panel state (`ui` token `i`), hidden while the layer is off and opened on first appearance unless a stored or shared collapse choice exists (`dataset.collapsedPreference`). `LayerPanel.attachRecentImagery(factory)` mounts the readout (`createRecentImageryPanel` in `src/ui/recentImagery.js`) into its `data-rail-scroller` body, as the weather readout is mounted. The body is a fixed stack in which no block changes height and no control moves in any state: `#ri-actions` (SELECT BOX · USE VIEW · CLEAR, rail-card actions), `#ri-notice` (one line: `#ri-notice-text` with the refusal, error, CLEAR notice or the Esri note, and `#ri-zoom-in` in a fixed slot at its right end, reserved unless an oversized box or view can be fitted), `#ri-strip` (day cards newest first: thumbnail, date, sensor, cloud, START HERE, PREVIEW, and a SHOW chip or A and B chips; ← → Home End move, S / A / B pin, Enter previews), `#ri-hint` (one line: the next step), `#ri-selection` (`#ri-mode` IMAGE · VS BASEMAP · A / B, then `#ri-slot-a` and `#ri-slot-b` with `#ri-unpin-a` / `#ri-unpin-b` kept in place when empty), `#ri-controls` (`#ri-opacity`, EXPORT / EXPORT A and EXPORT B) and `#ri-details`, a collapsed rail card holding the focused day's acquisition, coverage and granules, catalog notes, the empty-days toggle and the imagery credit. Absent controls are reserved (invisible), never removed. Every render preserves the body's `scrollTop`.
+- **Share links.** Layer options (token `1`): box edges as integers at degrees × 100000, pins `a` and `b` as compact days (`S20260918`), `m` mode (0 image, 1 basemap, 2 A / B), `p` split percent (share-link only: never stored locally) and `v` for the daily overview. Row chips: `MORE DETAIL · 30 m` (on) and `DAILY OVERVIEW · 250 m` (off).
+- Regression surface: the colocated `*.test.mjs` beside each module (shared doubles in `src/layers/recentImagery/testDoubles.mjs`; `src/ui/recentImagery.test.mjs` includes a DOM-structure guard: every control keeps its place in the tree, nothing is hidden, and every fixed-height block keeps the class the stylesheet fixes its height by; it has no layout, so it cannot see movement), `src/ui/layerPanel.test.mjs` (mount), `src/maps/controller.test.mjs` (`subscribe`), `src/data/layerState.test.mjs` (codec), `src/sharelink.celestial.test.mjs` (panel token), and the live gate `scripts/qa-recent-imagery.mjs`, which also measures every control's rect across the transitions within 1 px; that measurement is the real layout-shift check.
 
 ### 3D Aircraft + Tracking (June 2026)
 
@@ -4091,6 +4209,134 @@ explicitly. Each constructed layer owns its catalog, audio and lifecycle state.
 Existing catalog validation, category filters, tuning and voice playback behavior
 remain unchanged. Audio connects directly to the broadcaster after an explicit
 play action; the source does not relay or record streams.
+
+## Local RTL-SDR and Local ADS-B
+
+The Radio panel holds a Local RTL-SDR card below internet radio. One browser
+WebUSB session (`src/sdr/controller.js`) drives a USB RTL-SDR in desktop Chrome
+or Edge on localhost or HTTPS; nothing opens until CONNECT. Demodulation and
+Mode S decoding run in a worker; FM audio plays through an audio worklet.
+Local FM and internet radio are one listening surface: starting local FM stops
+internet-radio playback, and starting internet radio stops local FM. ADS-B
+reception does not interrupt internet radio.
+
+- **Modes.** FM (87.5–108 MHz, tune, seek, volume) or ADS-B at 1090 MHz.
+  With a receiver open, selecting ADS-B enables the Local ADS-B layer;
+  selecting FM disables it.
+  Enabling the layer switches the receiver to ADS-B; disabling it leaves the
+  receiver mode unchanged.
+- **Gain.** AUTO (tuner AGC) or a manual R820T step from 0.0 to 49.6 dB,
+  stored per mode in `gev:sdr:gain:v1`. Defaults: ADS-B 28.0 dB, FM AUTO.
+  Changes apply to the open receiver without reconnecting.
+- **Receiver stats (ADS-B).** CRC-valid messages per second, aircraft heard,
+  aircraft with a fresh position and the IQ level.
+- **Devices.** An already-authorized receiver opens without the WebUSB
+  picker. ADS-B prefers a device whose product name matches ADS-B or 1090 (the
+  1090 MHz channel of a dual-channel board); FM avoids ADS-B/UAT channels.
+  A device chosen in the picker is remembered per mode by vendor, product,
+  product name and serial in `gev:sdr:device:v1`. CHANGE DEVICE reopens the
+  picker. LOCATE uses browser location for receiver-relative CPR decoding.
+
+The Local ADS-B layer (`local-adsb`, `src/layers/localAdsb/`) is off by default
+and registered as local-only: it never enters share links or stored layer
+state. Its aircraft get the public Flights treatment in magenta, alongside
+the public Flights layer. Public Flights renders about one poll interval
+(~30 s) behind for smooth interpolation while local aircraft are shown as
+heard, so a local marker usually leads its public twin; both markers are drawn
+on purpose:
+
+- **Class.** Each aircraft is classified with `aircraftClass.js` from its
+  ADS-B emitter category (dump1090 strings: `A1` light, `A3` large, `A7`
+  rotorcraft; set A/B/C/D = type code 4/3/2/1) and, once known, its adsbdb
+  ICAO type. Silhouette and per-class scale come from `aircraftIcons.js`
+  (×0.8 on the ground), tinted magenta.
+- **3D.** The DISPLAY rail's 3D toggle and its proximity/all mode apply: the
+  layer reads the Flights layer's `models3d` params and uses the same ceiling,
+  caps, add/keep radii, visible-first eligibility
+  (`src/data/modelEligibility.js`) and per-class GLB
+  (`src/layers/flights/modelSpec.js`), tinted magenta through the same MIX
+  colour blend Flights uses for military amber. Heights are barometric +
+  geoid N, as Flights renders a contact without a geometric altitude; a
+  grounded model rides the one-shot ground snap and belly offset.
+- **Motion.** No display delay. The marker is extrapolated forward from the
+  newest fix with `motionModel.js` (arc extrapolation, path-derived course
+  blended over the reported track, rate-limited slew); a new fix is absorbed
+  by a correction that decays over 900 ms. Coasting continues while messages
+  arrive and stops 10 s after the last one (60 s at most).
+- **Sanity filter.** For airborne positions the browser decoder prefers a
+  fresh even/odd pair, then a frame decoded relative to the aircraft's own
+  position (under 10 minutes old), then the receiver location. Surface
+  positions are stricter: a single surface frame decodes only against the
+  aircraft's own recent fix, and only when that fix is provably within 45 NM
+  (it could not have gone farther since at its speed limit); the receiver
+  location never decodes a lone surface frame and only picks the quadrant of
+  a surface pair. Without an existing suitable fix for that aircraft
+  (airborne or surface, provably within 45 NM), surface acquisition
+  requires an even/odd pair. Every fix
+  must be reachable from the last accepted one at 1.5 × reported ground
+  speed + 50 kt (1,000 kt without a speed, 350 kt for A1/A7/B1/B4) over the
+  elapsed time + 1 s, plus 500 m.
+  Refused fixes are counted (`positionsRejected` in the SDR state; the layer
+  applies the same check to merged feed records and reports the total as
+  `rejectedPositions` in its stats). Three refusals in a row re-anchor.
+- **Trail.** A selected aircraft draws a magenta trail of the positions the
+  receiver heard (up to 10 minutes / 600 fixes, dropped with the aircraft),
+  with the tracked-flight trail look and a live head segment. No network
+  backfill.
+- **Enrichment.** Only the selected aircraft (type + route) and aircraft
+  about to render as models (type) are looked up, through the Flights
+  source's cached adsbdb proxy with the same once-per-session, four-in-flight,
+  200 ms drip rules.
+
+A marker drops once its newest position is 60 s old; an aircraft is forgotten
+after 60 s without a message. Clicking a marker opens a readout card (ICAO,
+callsign, class and category, adsbdb operator/type and a plausible route when
+known, altitude, ground speed, track, vertical rate, position age, message
+count, "Heard by your receiver"); markers are not camera-followed. Positioned
+aircraft join detection boxes, labelled only with a decoded callsign.
+
+Receivers publish one record shape from `src/sources/adsbRecords.js`
+(`icao`, `callsign`, `category`, `onGround`, `lat`, `lon`, `altitudeFt`,
+`groundSpeedKt`, `trackDeg`, `verticalRateFpm`, `lastPositionAt`,
+`lastMessageAt`, `messageCount`, `rssiDbfs`, `band`, `source`). `band` is `1090` or `978`; `source` is
+`webusb` (browser SDR) or `feed` (decoder feed).
+`normalizeDump1090Aircraft(json, nowMs, { band })` maps a dump1090/readsb/
+skyaware978 `aircraft.json` document into the same records. Voice
+`set_layer_visibility` accepts `local-adsb` ("local ADS-B", "my receiver",
+"my antenna").
+
+**Decoder feeds.** The layer's second input is the server route
+`GET /api/local-receivers/aircraft`
+(`server/providers/local-receivers.js`), configured only by the
+`LOCAL_RECEIVER_FEEDS` environment value (`band=url`, comma-separated, e.g.
+`1090=http://localhost:8080/data/aircraft.json`). Every host must pass
+`parseTapAddress` (loopback, RFC1918, `localhost`, `*.local`), the scheme must
+be http(s) and the path must end in `aircraft.json`; an invalid entry is logged
+at startup, reported `invalid` and never fetched. The route reads all feeds in
+parallel (2 s timeout, redirects refused, 2 MB cap, single-flight with a 1 s
+cache) and returns `{ configured, generatedAt, feeds: [{ band, label, status,
+aircraft, ageMs }], records }`, where a feed is `live`, `stale` (its own `now`
+is over 10 s old), `unreachable` or `invalid`. Labels name the band only;
+addresses and upstream error text stay on the server. Unconfigured, it returns
+`{ configured: false, feeds: [], records: [] }` without fetching.
+
+The browser session (`src/layers/localAdsb/feeds.js`) polls the route every
+second only while the layer is enabled and only while the route reports
+`configured`; the Local RTL-SDR card makes one probe request at startup to show
+its read-only "Decoder feeds: 1090 live · 978 live" line. Feed records are
+rebased to the browser clock and kept up to 60 s after their last message.
+`mergeLocalAdsbRecords` merges both inputs by ICAO, keeping the newest position
+(tie: newest message) and the bands/sources heard in the last 60 s; the card's
+receiver line names them ("Heard by your receiver · 1090 MHz + 978 MHz UAT ·
+browser SDR + decoder feed"). Aircraft heard only on 978 MHz UAT draw with a
+thin light-magenta ring. With feeds configured the row status reads "2 feeds
+live · 14 heard" when every feed is live. While any input is producing (the
+browser receiver streaming, or a feed live) the row stays nominal and names the
+other feeds as a trailing note ("3 heard · USB 5.8 msg/s · feed 1090 stale"),
+since a decoder stopped so the browser can take the dongle is not a fault. With
+nothing producing, every readable feed stale reads STALE and anything else is
+an error. Without feeds it keeps the WebUSB statuses. See
+`docs/LOCAL-RECEIVERS.md`.
 
 ## Bundled geography and submarine cable components
 
