@@ -308,8 +308,21 @@ test('关键动态串仍能译出（上游改拼接方式时本测试变红）',
 test("' · ' 分段翻译：译出已知段，保留专有名词段", () => {
   const { lookup } = loadPatch();
   const cases = [
-    ['MILITARY · LIVE · COURSE ALIGNED', '军用 · LIVE · 航向对齐'],
-    ['COMMERCIAL · STANDBY · COURSE ALIGNED', '民航 · STANDBY · 航向对齐'],
+    // 驾驶舱芯片（src/ui/cockpitInstruments.js:136）：
+    //   `${MILITARY|COMMERCIAL} · ${feedState} · COURSE ALIGNED`
+    // feedState 只有四种取值：ACQUIRING SURFACE / SURFACE FALLBACK /
+    // STALE FEED / LIVE TRACK。下面四条覆盖全部取值，全部必须整串译出。
+    // ⚠ 历史教训：这里曾写成 'MILITARY · LIVE · COURSE ALIGNED'（期望 LIVE
+    // 保留英文）——上游从不输出裸 LIVE，那条断言是凭想象编的，而且正因为词典
+    // 里没有 LIVE 才「通过」，属假绿。2026-09-29 补齐状态词后立刻暴露。
+    ['MILITARY · LIVE TRACK · COURSE ALIGNED', '军用 · 实时轨迹 · 航向对齐'],
+    ['COMMERCIAL · LIVE TRACK · COURSE ALIGNED', '民航 · 实时轨迹 · 航向对齐'],
+    ['MILITARY · STALE FEED · COURSE ALIGNED', '军用 · 数据过期 · 航向对齐'],
+    ['COMMERCIAL · SURFACE FALLBACK · COURSE ALIGNED', '民航 · 地表回退 · 航向对齐'],
+    // 交通图层状态行（src/layers/traffic/model.js、controls.js）——本轮上游
+    // Overpass 卸载重构新增，' · ' 段内是 JS 现拼的动态串。
+    ['LIVE · Roads: TomTom · Flow 42%', '实时 · 路网来源: TomTom · 路况覆盖 42%'],
+    ['SIMULATED · Roads: OpenStreetMap · Flow 0%', '模拟 · 路网来源: OpenStreetMap · 路况覆盖 0%'],
     ['ASCENT PATH · 3.2 km', '上升轨迹 · 3.2 km'],
     ['LAUNCH SITE · Vandenberg SLC-4E', '发射场 · Vandenberg SLC-4E'],
     ['SATELLITE SPEED · 7.6 km/s', '卫星速度 · 7.6 km/s'],
@@ -570,7 +583,7 @@ test("上游用已汉化标题拼串：'Expand 数据图层' 不得半中半英"
     // 译不出后半段时整条放弃（不产出半中半英）
     ['Expand detailed Radio controls', null],
     // 防回环未破：已译内容不得被改写
-    ['军用 · LIVE · 航向对齐', null],
+    ['军用 · 实时轨迹 · 航向对齐', null],
     ['帧率 60', null],
   ];
   const failures = [];
@@ -605,7 +618,10 @@ test('幂等性：译文回写后不得被反复改写（防 MutationObserver �
   const { translateNode } = loadPatch();
   // 这些译文自身仍含 ' · '，是最容易触发回环的场景
   const inputs = [
-    'MILITARY · LIVE · COURSE ALIGNED',
+    'MILITARY · LIVE TRACK · COURSE ALIGNED',
+    // 本轮上游 Overpass 卸载重构新增的交通状态行，译文同样含 ' · '
+    'LIVE · Roads: TomTom · Flow 42%',
+    'SIMULATED · Roads: OpenStreetMap · Flow: TomTom (no matches)',
     'ASCENT PATH · 3.2 km',
     'LAUNCH SITE · Vandenberg SLC-4E',
     'Ready — playback starts only from your action · muted during voice interaction',
@@ -624,10 +640,10 @@ test('幂等性：译文回写后不得被反复改写（防 MutationObserver �
   }
 
   // 已含中文的复合串必须零写入
-  const settled = textNode('军用 · LIVE · 航向对齐');
+  const settled = textNode('军用 · 实时轨迹 · 航向对齐');
   for (let round = 0; round < 5; round += 1) translateNode(settled);
   assert.equal(settled.writes, 0, '已翻译内容被重复写入');
-  assert.equal(settled.data, '军用 · LIVE · 航向对齐');
+  assert.equal(settled.data, '军用 · 实时轨迹 · 航向对齐');
 });
 
 test('高频动态串压力：200 轮重扫只应写入节点数次', () => {
@@ -808,3 +824,163 @@ test('语言开关：gev-lang=en 时补丁完全不介入', () => {
   sandbox.window.confirm('Delete scene "X" and all shots?');
   assert.deepEqual(dialogCalls[0], ['Delete scene "X" and all shots?'], 'gev-lang=en 时不应 hook 弹窗');
 });
+
+test('图层面板明细行 / feed 状态：JS 现拼的动态串必须译出', () => {
+  const { lookup } = loadPatch();
+
+  // 这批串全是 JS 运行时拼出来的（src/ui/layerPanel.js 渲染
+  // `${source} · ${loadingLabel}` 与 stats.error），**静态门槛看不到**——
+  // 门槛只扫 src/ui/templates/*.html。2026-09-29 同步上游 Overpass 卸载重构后
+  // 实测 79 条未译，其中 14 条是本轮引入的退化。故单独建门槛守住。
+  const cases = [
+    // feed 状态徽标（src/data/layerSnapshot.js FEED_STATE_LABELS）
+    ['UNAVAILABLE', '不可用'],
+    ['DEGRADED', '降级'],
+    ['FALLBACK', '回退'],
+    ['LIVE', '实时'],
+    ['SIMULATED', '模拟'],
+
+    // 交通图层状态行原子段（src/layers/traffic/controls.js roadStatusLabel）
+    ['Roads unavailable', '路网数据不可用'],
+    ['Local surface still loading', '本地路面数据加载中'],
+    ['Partial coverage', '部分覆盖'],
+    ['Detailed roads unavailable', '详细路网不可用'],
+    ['Reduced detail coverage', '细节覆盖降级'],
+    ['Hybrid needs a TomTom key', 'Hybrid 模式需要 TomTom 密钥'],
+    ['TomTom roads need a TomTom key', 'TomTom 路网需要 TomTom 密钥'],
+    // 复合串：状态词 + ' · ' 段内动态部分
+    ['UNAVAILABLE · OpenStreetMap · Roads unavailable', '不可用 · OpenStreetMap · 路网数据不可用'],
+    ['TomTom roads unavailable while the traffic service is unreachable',
+      '路况服务不可达，TomTom 路网暂不可用'],
+    ['SIMULATED — traffic service unreachable', '模拟 — 路况服务不可达'],
+    ['SIMULATED — add TomTom key for live', '模拟 — 请配置 TomTom 密钥以启用实时数据'],
+    ['TomTom daily budget reached', 'TomTom 当日额度已用完'],
+
+    // 已标注设施（src/data/installationFeedback.js）——计数串是动态拼接
+    ['Map tiles temporarily unavailable', '地图瓦片暂不可用'],
+    ['Mapped names temporarily unavailable', '已标注名称暂不可用'],
+    ['No mapped sites in view', '视野内无已标注设施'],
+    ['12 mapped sites in view', '视野内有 12 处已标注设施'],
+    ['1 mapped site in view', '视野内有 1 处已标注设施'],
+    ['No mapped sites within 5 km of the contact', '目标周边 5 公里内无已标注设施'],
+    ['3 mapped sites within 5 km of the contact', '目标周边 5 公里内有 3 处已标注设施'],
+    ['Map tiles temporarily unavailable — retrying in 12s', '地图瓦片暂不可用 — 12 秒后重试'],
+    ['Overpass timed out — retry pending', 'Overpass 请求超时 — 等待重试'],
+    ['Too many mapped sites in view to list them all', '视野内已标注设施过多，无法全部列出'],
+    ['Installation context unavailable', '设施周边信息不可用'],
+
+    // ALPR 摄像头（src/layers/alpr/index.js、source.js）
+    ['Zoom in to load mapped cameras', '请放大以加载已标注摄像头'],
+    ['Showing cached locations', '正在显示缓存位置'],
+    ['Coverage limited — zoom in', '覆盖受限 — 请放大'],
+    ['No ALPR data for this area — US and Canada only', '该区域无 ALPR 数据 — 仅覆盖美国与加拿大'],
+    ['None on screen — nearby cameras are outside the view', '屏幕内无目标 — 附近摄像头在视野之外'],
+    ['Camera coverage unavailable', '摄像头覆盖范围不可用'],
+
+    // 矢量瓦片（src/sources/vectorTiles.js）
+    ['Vector tiles unavailable', '矢量瓦片不可用'],
+    ['Vector tiles unavailable (HTTP 429)', '矢量瓦片不可用（HTTP 429）'],
+    ['Zoom in for vector tile coverage', '请放大以获取矢量瓦片覆盖'],
+
+    // 标注轮廓 / 地点导航 toast
+    ['Detailed outline unavailable', '详细轮廓不可用'],
+    ['Cedar Complex · Detailed outline unavailable', 'Cedar Complex · 详细轮廓不可用'],
+    ['Military area', '军事区域'],
+    ['Location not found', '未找到该地点'],
+    ['Search failed', '搜索失败'],
+    ['Fly to a POI first', '请先飞往一个兴趣点'],
+
+    // layerPanel 通用片段
+    ['never', '从未'],
+    ['loading...', '加载中…'],
+    ['12 of 40 records accepted', '40 条记录中已接受 12 条'],
+    ['incomplete snapshot', '快照不完整'],
+  ];
+
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) {
+      failures.push(`${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`);
+    }
+  }
+  assert.deepEqual(
+    failures,
+    [],
+    `图层面板 / 状态行动态串回归（这些是 JS 现拼、静态门槛覆盖不到的串）：\n  ${failures.join('\n  ')}`,
+  );
+});
+
+test('专有名词不得因状态词规则被误译（防过宽）', () => {
+  const { lookup } = loadPatch();
+
+  // 新增了 LIVE / SIMULATED / UNAVAILABLE 等高频状态词与一批 ' — '、
+  // '(HTTP nnn)'、计数类规则后，必须确认它们没有波及数据源名、地名、
+  // 纯数据读数。lookup 返回 null 表示补丁不介入（原样保留）。
+  const keep = [
+    // 数据源 / 品牌名（图层 source 标签，两个都是专有名词）
+    'OpenStreetMap / TomTom',
+    'TomTom + OpenStreetMap',
+    // 地名、火场名等专有名词
+    'Cedar Complex',
+    'Vandenberg SLC-4E',
+    'BBC World Service',
+    // 纯数据读数与坐标
+    '3.2 km',
+    '7.6 km/s',
+    '18.5 °C',
+    '42%',
+    'HTTP 429',
+    // 上游内部标识符
+    'military_land',
+    'ofm:3/2/1:4',
+  ];
+
+  const failures = keep.filter((t) => lookup(t) !== null);
+  assert.deepEqual(
+    failures,
+    [],
+    `以下内容被误译（状态词规则过宽）：${failures.map((f) => JSON.stringify(f)).join(', ')}`,
+  );
+
+  // 反向确认：这些规则确实生效，而不是因为 lookup 整体失灵才「保留原文」
+  assert.equal(lookup('LIVE'), '实时');
+  assert.equal(lookup('Vector tiles unavailable (HTTP 429)'), '矢量瓦片不可用（HTTP 429）');
+  assert.equal(lookup('12 mapped sites in view'), '视野内有 12 处已标注设施');
+});
+
+test('小写状态词的 dictOnly 大小写兜底：锁定行为并确认其安全性', () => {
+  const { lookup } = loadPatch();
+
+  // dictOnly 的匹配顺序是「精确 → toUpperCase() → toLowerCase()」，这是补丁的
+  // 既有设计（为了让 calm/Calm、clear/CLEAR 这类不同大小写写法各自命中）。
+  // 副作用是：新增全大写状态词条后，小写同名串也会被兜底翻译。
+  //
+  // 这条断言**锁定**该行为，避免后人误以为是 bug 去「修」，或反过来在不知情
+  // 下依赖它。它安全的前提是（2026-09-29 已逐一 grep 核实）：
+  //   1. 上游凡把状态词渲染成可见文本的路径，都先做 .toUpperCase()
+  //      （src/ui/cctvFrames.js:109）或直接使用大写字面量
+  //      （src/ui/cockpitInstruments.js:136 的 LIVE TRACK / STALE FEED、
+  //        src/ui/layerPanel.js 走 FEED_STATE_LABELS 映射）。
+  //   2. 小写形式只出现在内部状态值、dataset.state、CSS class（如
+  //      `classList.toggle('unavailable', …)`、`dataset.state = 'unavailable'`）。
+  //   3. 补丁翻译的属性白名单只有 placeholder / title / aria-label / alt，
+  //      data-state 不在其中，故 CSS 钩子不受影响。
+  //
+  // ⚠ 若日后上游新增「把小写状态词直接 textContent 进 DOM」的代码，这条
+  // 兜底就会把它译成中文——届时应在 CONTEXT_WORDS 里消歧，而不是删本断言。
+  const lower = ['unavailable', 'degraded', 'fallback', 'simulated', 'live'];
+  for (const word of lower) {
+    assert.equal(
+      lookup(word),
+      lookup(word.toUpperCase()),
+      `小写 ${word} 未走大小写兜底（dictOnly 匹配顺序被改动了？）`,
+    );
+  }
+
+  // 大小写共存仍须成立：精确匹配优先，兜底不得覆盖已有的独立词条。
+  // 例如手绘面板的 Clear（清除）与气象读数 CLEAR（晴）——历史血泪教训。
+  assert.equal(lookup('Clear'), '清除');
+  assert.notEqual(lookup('Clear'), lookup('CLEAR'));
+});
+

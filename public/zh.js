@@ -144,6 +144,10 @@
     'SUMMARY': '摘要', 'LOCAL': '本地', 'LOCAL INFO': '本地信息',
     'LIVE SIGNALS': '实时信号', 'LIVE TRACK': '实时轨迹',
     'LIVE TRACK · COURSE ALIGNED': '实时轨迹 · 航向对齐',
+    // 驾驶舱芯片的另外两种 feedState（src/ui/cockpitInstruments.js）：
+    // surfaceAcquiring → ACQUIRING SURFACE（见下）、surfaceFallback → SURFACE FALLBACK、
+    // info.stale → STALE FEED，最后兜底 LIVE TRACK。
+    'STALE FEED': '数据过期', 'SURFACE FALLBACK': '地表回退',
     'COURSE ALIGNED': '航向对齐', 'MILITARY': '军用', 'COMMERCIAL': '民航',
     'ALTITUDE': '高度', 'ALTITUDE · FT': '高度 · 英尺',
     'GROUND SPEED': '地速', 'GROUND SPEED · KTS': '地速 · 节',
@@ -713,7 +717,102 @@
     '← → preview · A or B pins the focused day': '← → 预览 · A 或 B 固定当前聚焦的一天',
     '← → preview the other side · A or B pins it': '← → 预览另一侧 · A 或 B 固定该侧',
     'S on another day replaces it · × unpins': '在其他日期按 S 会替换固定 · × 取消固定',
-    '← → preview · S shows the focused day': '← → 预览 · S 显示当前聚焦的一天'
+    '← → preview · S shows the focused day': '← → 预览 · S 显示当前聚焦的一天',
+
+    // ===== 图层 feed 状态徽标（src/data/layerSnapshot.js FEED_STATE_LABELS）=====
+    // 上游只建了 STALE / LOADING 两个，其余一直缺失，导致明细行半中半英。
+    // 小写形式（live / unavailable / degraded / fallback / never）在上游只作
+    // 内部状态值与 dataset.state / CSS class 使用，不作为可见文本渲染，
+    // 故 dictOnly 的大小写兜底不会误伤（已 grep 核实）。
+    'UNAVAILABLE': '不可用',
+    'DEGRADED': '降级',
+    'FALLBACK': '回退',
+    'LIVE': '实时',
+    'SIMULATED': '模拟',
+    'ENABLING': '启用中',
+    'DISABLING': '停用中',
+
+    // ===== 交通图层状态行（src/layers/traffic/controls.js roadStatusLabel、model.js）=====
+    // 本轮上游 Overpass 卸载重构新增：路网改走 OpenFreeMap 矢量瓦片，状态行由
+    // notes 数组用 ' · ' 拼接后交 layerPanel 渲染成明细行。原子段建键即可，
+    // 复合串由 translateSegments 自动拼装。
+    'Roads unavailable': '路网数据不可用',
+    'Syncing flow': '正在同步路况',
+    'Local surface still loading': '本地路面数据加载中',
+    'Partial coverage': '部分覆盖',
+    'Detailed roads unavailable': '详细路网不可用',
+    'Reduced detail coverage': '细节覆盖降级',
+    'Roads without flow hidden': '无路况数据的路段已隐藏',
+    'No flow roads in view': '视野内无路况路段',
+    'Unmatched: simulated': '未匹配部分为模拟数据',
+    'Hybrid needs a TomTom key': 'Hybrid 模式需要 TomTom 密钥',
+    'TomTom roads need a TomTom key': 'TomTom 路网需要 TomTom 密钥',
+    'Hybrid unavailable while the traffic service is unreachable':
+      '路况服务不可达，Hybrid 模式暂不可用',
+    'TomTom roads unavailable while the traffic service is unreachable':
+      '路况服务不可达，TomTom 路网暂不可用',
+    'TomTom key unavailable': 'TomTom 密钥不可用',
+    'TomTom daily budget reached': 'TomTom 当日额度已用完',
+    'TomTom upstream unreachable': 'TomTom 上游不可达',
+    'TomTom flow unavailable': 'TomTom 路况数据不可用',
+    'traffic service unreachable': '路况服务不可达',
+    'add TomTom key for live': '请配置 TomTom 密钥以启用实时数据',
+    'OpenFreeMap tiles rate-limited': 'OpenFreeMap 瓦片被限流',
+    'OpenFreeMap tiles timed out': 'OpenFreeMap 瓦片请求超时',
+    'OpenFreeMap tiles unavailable': 'OpenFreeMap 瓦片不可用',
+
+    // ===== 已标注设施图层（src/data/installationFeedback.js、controls.js、ingestion.js）=====
+    'Map tiles temporarily unavailable': '地图瓦片暂不可用',
+    'Mapped names temporarily unavailable': '已标注名称暂不可用',
+    'Overpass rate-limited': 'Overpass 已限流',
+    'Overpass timed out': 'Overpass 请求超时',
+    'Overpass could not complete the query': 'Overpass 无法完成查询',
+    'Overpass temporarily unavailable': 'Overpass 暂不可用',
+    'Retrying mapped sites…': '正在重试已标注设施…',
+    'Fetching mapped sites…': '正在获取已标注设施…',
+    'Zoom in to search mapped installations': '请放大以搜索已标注设施',
+    'Showing cached mapped sites': '正在显示缓存的已标注设施',
+    'Mapped sites not loaded': '已标注设施未加载',
+    'Too many mapped sites in view to list them all':
+      '视野内已标注设施过多，无法全部列出',
+    'Installation context unavailable': '设施周边信息不可用',
+    'loading mapped installation context': '正在加载设施周边信息',
+    'Serving cached mapped context': '正在提供缓存的已标注周边信息',
+    'date unknown': '日期未知',
+    'CURRENT VIEWPORT ONLY': '仅当前视野',
+    'Military area': '军事区域',
+    'MAPPED INSTALLATION': '已标注设施',
+
+    // ===== ALPR 摄像头图层（src/layers/alpr/index.js、source.js）=====
+    'retrying mapped ALPR cameras': '正在重试已标注 ALPR 摄像头',
+    'loading mapped ALPR cameras': '正在加载已标注 ALPR 摄像头',
+    'No ALPR data for this area — US and Canada only':
+      '该区域无 ALPR 数据 — 仅覆盖美国与加拿大',
+    'No ALPR data for this area': '该区域无 ALPR 数据',
+    'Zoom in to load mapped cameras': '请放大以加载已标注摄像头',
+    'Showing cached locations': '正在显示缓存位置',
+    'Coverage limited — zoom in': '覆盖受限 — 请放大',
+    'None on screen — nearby cameras are outside the view':
+      '屏幕内无目标 — 附近摄像头在视野之外',
+    'Camera coverage unavailable': '摄像头覆盖范围不可用',
+
+    // ===== 矢量瓦片数据源（src/sources/vectorTiles.js）=====
+    'Vector tiles unavailable': '矢量瓦片不可用',
+    'Zoom in for vector tile coverage': '请放大以获取矢量瓦片覆盖',
+
+    // ===== 图层面板通用明细行（src/ui/layerPanel.js）=====
+    'never': '从未',
+    'loading...': '加载中…',
+    'incomplete snapshot': '快照不完整',
+    'lifecycle state requires reconciliation': '生命周期状态待校正',
+
+    // ===== 标注轮廓 / 地点导航 =====
+    // src/annotations/screenAnnotationRenderer.js 把「名称 · Detailed outline
+    // unavailable」拼进 SVG text；src/ui/locationNavigation.js 直接弹 toast。
+    'Detailed outline unavailable': '详细轮廓不可用',
+    'Location not found': '未找到该地点',
+    'Search failed': '搜索失败',
+    'Fly to a POI first': '请先飞往一个兴趣点'
   };
 
   /* 中文前缀 + 译文拼接：译文以中文开头时不补空格（否则是「正在切换到 调频」）。
@@ -950,7 +1049,56 @@
     [/^FIRE · (.+)$/, function (m) { return '火灾 · ' + m[1]; }],
     [/^Unnamed incident$/, function () { return '未命名火场'; }],
     [/^part of (.+)$/, function (m) { return '隶属 ' + m[1]; }],
-    [/^Open FIRE · (.+) on InciWeb$/, function (m) { return '在 InciWeb 打开「火灾 · ' + m[1] + '」'; }]
+    [/^Open FIRE · (.+) on InciWeb$/, function (m) { return '在 InciWeb 打开「火灾 · ' + m[1] + '」'; }],
+
+    // ===== 图层状态明细行（src/ui/layerPanel.js 渲染 `${source} · ${loadingLabel}`）=====
+    // 2026-09-29 同步上游 Overpass 卸载重构后补齐：这批串全是 JS 现拼，
+    // 静态门槛（只扫 src/ui/templates/*.html）看不到，须靠规则覆盖。
+    // ' · ' 复合串由 translateSegments 逐段命中，这里只需覆盖**段内**的动态部分。
+    [/^Roads: (.+)$/, function (m) { return '路网来源: ' + tr(m[1]); }],
+    [/^Flow: TomTom \(no matches\)$/, function () { return '路况数据: TomTom（无匹配）'; }],
+    [/^Flow: (.+)$/, function (m) { return '路况数据: ' + tr(m[1]); }],
+    [/^Flow (\d+)%$/, function (m) { return '路况覆盖 ' + m[1] + '%'; }],
+    [/^(\d+)% cov$/, function (m) { return '覆盖 ' + m[1] + '%'; }],
+    [/^retrying in (\d+)s$/, function (m) { return m[1] + ' 秒后重试'; }],
+    [/^retry (\d+)s$/, function (m) { return m[1] + ' 秒后重试'; }],
+    [/^retry pending$/, function () { return '等待重试'; }],
+    [/^(\d+) of (\d+) records accepted$/, function (m) { return m[2] + ' 条记录中已接受 ' + m[1] + ' 条'; }],
+
+    // 状态词 + 破折号补充说明（`SIMULATED — add TomTom key for live`）。
+    // 注意分隔符是 ' — '（em dash），不是 ' · '，translateSegments 切不开，须整串规则。
+    [/^(LIVE|SIMULATED|UNAVAILABLE|DEGRADED|FALLBACK|STALE) — (.+)$/,
+      function (m) { var rest = trKeep(m[2]); return rest ? tr(m[1]) + ' — ' + rest : null; }],
+    [/^Detailed roads unavailable — (.+)$/, function (m) {
+      var rest = trKeep(m[1]);
+      return rest ? '详细路网不可用 — ' + rest : null;
+    }],
+    // 设施/瓦片不可用原因 + 重试倒计时（src/data/installationFeedback.js：
+    // `${reason} — retrying in ${s}s` 或 `${reason} — retry pending`）。
+    // reason 段（Overpass timed out 等）已在词典，用 trKeep 严格译，译不出就整条放弃。
+    [/^(.+) — (retrying in \d+s|retry pending)$/, function (m) {
+      var head = trKeep(m[1]), tail = trKeep(m[2]);
+      return head && tail ? head + ' — ' + tail : null;
+    }],
+
+    // 已标注设施计数串（src/data/installationFeedback.js）：
+    // `${count} mapped site(s)${where}`，where 为 ' in view' 或 ` within N km of the contact`。
+    [/^No mapped sites in view$/, function () { return '视野内无已标注设施'; }],
+    [/^No mapped sites within (\d+) km of the contact$/, function (m) {
+      return '目标周边 ' + m[1] + ' 公里内无已标注设施';
+    }],
+    [/^(\d+) mapped sites? in view$/, function (m) { return '视野内有 ' + m[1] + ' 处已标注设施'; }],
+    [/^(\d+) mapped sites? within (\d+) km of the contact$/, function (m) {
+      return '目标周边 ' + m[2] + ' 公里内有 ' + m[1] + ' 处已标注设施';
+    }],
+    [/^WITHIN (\d+) KM$/, function (m) { return '半径 ' + m[1] + ' 公里内'; }],
+
+    // 瓦片 / 上游错误带 HTTP 状态码（src/sources/vectorTiles.js、src/layers/traffic/source.js、flow.js）
+    [/^Vector tiles unavailable \(HTTP (\d+)\)$/, function (m) { return '矢量瓦片不可用（HTTP ' + m[1] + '）'; }],
+    [/^OpenFreeMap tiles unavailable \(HTTP (\d+)\)$/, function (m) { return 'OpenFreeMap 瓦片不可用（HTTP ' + m[1] + '）'; }],
+    [/^TomTom flow error \(HTTP (\d+)\)$/, function (m) { return 'TomTom 路况错误（HTTP ' + m[1] + '）'; }],
+    [/^Camera tile feature limit exceeded$/, function () { return '摄像头瓦片要素数超出上限'; }],
+    [/^Vector tile feature limit exceeded$/, function () { return '矢量瓦片要素数超出上限'; }]
   ];
 
   /* 词典直查（不含分段/规则），供 RULES 内部复用 */
