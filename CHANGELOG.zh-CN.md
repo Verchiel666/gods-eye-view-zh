@@ -15,7 +15,7 @@
 - **图层 feed 状态徽标补全**（`src/data/layerSnapshot.js` 的 `FEED_STATE_LABELS`）— 上游有五个状态词，词典此前只建了 `STALE`、`LOADING` 两个，`UNAVAILABLE`/`DEGRADED`/`FALLBACK` 一直缺失，导致明细行长期半中半英；另补 `ENABLING`/`DISABLING`。
 - **图层面板通用片段**（`src/ui/layerPanel.js`）— `never`、`loading...`、`incomplete snapshot`、`12 of 40 records accepted`、`lifecycle state requires reconciliation`。
 - **标注轮廓与地点导航** — `Detailed outline unavailable`（`screenAnnotationRenderer.js` 把它拼进 SVG text）、`Military area`（`openFreeMap.js` 无名军事区占位名）、三条地点导航 toast：`Location not found`、`Search failed`、`Fly to a POI first`。
-- 词典从 766 条扩充到 **835 条**（+69），动态串规则 117 → **139 条**（+22）。
+- 词典从 766 条扩充到 **841 条**（+75），动态串规则 117 → **139 条**（+22）。
 
 ### 修复（一处是门槛里的假绿断言，两处是真实漏译）
 
@@ -26,7 +26,7 @@
 
 ### 门槛强化
 
-- 新增测试 **`图层面板明细行 / feed 状态：JS 现拼的动态串必须译出`** — 固化 47 条真实动态串。这批串全是 JS 运行时拼的（`layerPanel.js` 渲染 `${source} · ${loadingLabel}` 与 `stats.error`、`installationFeedback()` 拼计数与重试倒计时），**静态 HTML 门槛扫不到**：门槛只读 `src/ui/templates/*.html`，本轮上游一个模板都没动，所以门槛 18/18 全绿的同时实测有 79 条未译。不单独设门槛就没有任何信号。
+- 新增测试 **`图层面板明细行 / feed 状态：JS 现拼的动态串必须译出`** — 固化 56 条真实动态串。这批串全是 JS 运行时拼的（`layerPanel.js` 渲染 `${source} · ${loadingLabel}` 与 `stats.error`、`installationFeedback()` 拼计数与重试倒计时），**静态 HTML 门槛扫不到**：门槛只读 `src/ui/templates/*.html`，本轮上游一个模板都没动，所以门槛 18/18 全绿的同时实测有 79 条未译。不单独设门槛就没有任何信号。
 - 新增测试 **`专有名词不得因状态词规则被误译（防过宽）`** — 新增高频状态词与 `— retrying in Ns`、`(HTTP nnn)`、计数类规则后，守住数据源名（`OpenStreetMap / TomTom`、`TomTom + OpenStreetMap`）、专有名词（`Cedar Complex`、`Vandenberg SLC-4E`、`BBC World Service`）、纯数据读数（`3.2 km`、`7.6 km/s`、`42%`、`HTTP 429`）与上游内部标识符（`military_land`、`ofm:3/2/1:4`）不被波及。同一测试内**反向确认规则确实生效**（断言 `LIVE`→实时、`Vector tiles unavailable (HTTP 429)` 与计数串译对），避免「因为 lookup 整体失灵所以全都保留原文」这种假绿。
 - 新增测试 **`小写状态词的 dictOnly 大小写兜底：锁定行为并确认其安全性`** — 见上文修复第三条。
 - **三处修复与两处新门槛都做了反向验证**（不是只看绿灯）：
@@ -43,6 +43,7 @@
 - **「门槛全绿」不等于「汉化没退化」，静态门槛有结构性盲区。** 本轮门槛 18/18 全绿、完整测试 0 失败，但实测有 79 条用户可见文案是英文——因为它们由 JS 运行时拼接，而门槛只扫 HTML 模板。判读方法：**上游没动模板文件 ≠ 没有新文案**。凡是改了图层状态机、反馈函数、错误消息目录（本轮的 `installationFeedback()`、`roadStatusLabel()`、`roadRequestError()`、`deriveTrafficFlowError()` 都属于这类），就必须从源码里抠出真实串跑探针，不能只看门槛。
 - **测试用例本身也会过期/虚构，且过期方式偏偏是「假绿」。** `LIVE`/`STANDBY` 那两条断言写的时候可能上游确实输出过，也可能一开始就是凭印象编的；无论哪种，它们后来的「通过」都只是因为词典缺条目。**给分段翻译写用例时，断言必须能区分「刻意保留专有名词」和「词典漏了」**——前者要有正向对照（同一测试里断言某个专有名词确实译不出、某个相邻段确实译得出），否则漏译会伪装成保护。本轮的修法是把用例全部换成上游源码里能 grep 到的真实输出。
 - **反向验证要先确认「破坏动作本身语法有效」。** 第一次做规则级破坏时用 shell 内联 `node -e` 改正则，转义层层出错把文件改成语法错误，结果门槛一片红——那不是规则级验证，是级联失败。改为先 `node --check` 确认文件仍可加载、再跑测试，红才有意义。
+- **从 diff 粗提取的候选串，补之前也要 grep 出处。** 第一轮提取把 `Invalid vector tile selection` / `Invalid vector tile viewport` 列为候选，实际 `grep -rn` 全仓源码（排除测试）**根本不存在这两个串**——它们只出现在测试文件里。真正存在的是 `Invalid vector tile metadata` / `Invalid vector tile origin`。差点照单全收补进词典，那就是在翻译幽灵文案。这和上文那条虚构测试用例是同一类错误：**候选串和测试用例一样，都必须能 grep 到出处**。
 
 ### 同步记录
 

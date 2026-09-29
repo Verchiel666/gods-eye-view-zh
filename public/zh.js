@@ -760,6 +760,19 @@
     'OpenFreeMap tiles rate-limited': 'OpenFreeMap 瓦片被限流',
     'OpenFreeMap tiles timed out': 'OpenFreeMap 瓦片请求超时',
     'OpenFreeMap tiles unavailable': 'OpenFreeMap 瓦片不可用',
+    // TomTom 路况超时（src/layers/traffic/source.js）——会被包进 RoadRequestError，
+    // 再拼进 `Detailed roads unavailable — <message>`（ingestion.js:594），故必补，
+    // 否则 trKeep 译不出后半段会让整条复合串放弃、界面显示完整英文。
+    'TomTom flow timed out': 'TomTom 路况请求超时',
+    // 矢量瓦片元数据不可用 / 上游响应过大：经 `error?.message ||` 透传到图层明细行
+    'Vector tile metadata unavailable': '矢量瓦片元数据不可用',
+    // 矢量瓦片元数据/原点无效（src/sources/vectorTiles.js:126,136,145）——上游返回
+    // 畸形数据时的守卫，经 ALPR 的 getMetadata 错误路径同样透传到明细行，故一并补。
+    // 注意：Invalid vector tile selection / viewport 源码中并不存在（仅出现在测试里），
+    // 是第一轮从 diff 粗提取时混入的虚构候选，不补（用例必须能 grep 到出处）。
+    'Invalid vector tile metadata': '矢量瓦片元数据无效',
+    'Invalid vector tile origin': '矢量瓦片原点无效',
+    'Upstream response too large': '上游响应过大',
 
     // ===== 已标注设施图层（src/data/installationFeedback.js、controls.js、ingestion.js）=====
     'Map tiles temporarily unavailable': '地图瓦片暂不可用',
@@ -795,6 +808,9 @@
     'None on screen — nearby cameras are outside the view':
       '屏幕内无目标 — 附近摄像头在视野之外',
     'Camera coverage unavailable': '摄像头覆盖范围不可用',
+    // ALPR 数据源兜底错误（src/layers/alpr/index.js:278 `error?.message || '...'`），
+    // 经 state.error → stats.error 被 layerPanel 渲染成明细行，故必补。
+    'Camera source temporarily unavailable': '摄像头数据源暂不可用',
 
     // ===== 矢量瓦片数据源（src/sources/vectorTiles.js）=====
     'Vector tiles unavailable': '矢量瓦片不可用',

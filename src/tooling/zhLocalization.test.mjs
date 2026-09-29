@@ -881,6 +881,19 @@ test('图层面板明细行 / feed 状态：JS 现拼的动态串必须译出', 
     ['Vector tiles unavailable', '矢量瓦片不可用'],
     ['Vector tiles unavailable (HTTP 429)', '矢量瓦片不可用（HTTP 429）'],
     ['Zoom in for vector tile coverage', '请放大以获取矢量瓦片覆盖'],
+    ['Vector tile metadata unavailable', '矢量瓦片元数据不可用'],
+    ['Invalid vector tile metadata', '矢量瓦片元数据无效'],
+    ['Invalid vector tile origin', '矢量瓦片原点无效'],
+
+    // 错误消息经 `error?.message || '...'` 透传后被拼进复合明细行
+    //（src/layers/traffic/ingestion.js:594）。后半段必须能译出，否则
+    // trKeep 会让整条规则放弃、界面显示完整英文。这是本轮最隐蔽的一类缺口。
+    ['TomTom flow timed out', 'TomTom 路况请求超时'],
+    ['Upstream response too large', '上游响应过大'],
+    ['Camera source temporarily unavailable', '摄像头数据源暂不可用'],
+    ['Detailed roads unavailable — TomTom flow timed out', '详细路网不可用 — TomTom 路况请求超时'],
+    ['Detailed roads unavailable — Vector tile metadata unavailable', '详细路网不可用 — 矢量瓦片元数据不可用'],
+    ['Detailed roads unavailable — OpenFreeMap tiles timed out', '详细路网不可用 — OpenFreeMap 瓦片请求超时'],
 
     // 标注轮廓 / 地点导航 toast
     ['Detailed outline unavailable', '详细轮廓不可用'],
