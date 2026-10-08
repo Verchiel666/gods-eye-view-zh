@@ -100,21 +100,23 @@ async function main() {
   const monitors = [];
   try {
     const page = await browser.newPage();
+    // zh fork: pin English before ANY navigation so the zh overlay never
+    // activates — it rewrites the English strings this gate asserts on, and
+    // under swiftshader its MutationObserver load stalls boot (see
+    // qa-street-level.mjs). Must be registered before the first goto below.
+    await page.evaluateOnNewDocument(() => {
+      try {
+        localStorage.setItem('gev-lang', 'en');
+      } catch {
+        /* keep going */
+      }
+    });
     await page.setViewport(VIEWPORT);
     const errors = [];
     monitors.push(watchPage(page, { name: 'panel', errors }));
     await hookRenderErrors(page);
 
     const boot = async () => {
-      // zh fork: pin English so the zh overlay does not rewrite the UI
-      // strings this gate asserts on (same reason as qa-street-level.mjs).
-      await page.evaluateOnNewDocument(() => {
-        try {
-          localStorage.setItem('gev-lang', 'en');
-        } catch {
-          /* keep going */
-        }
-      });
       await page.goto(`${url}/`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => window.__godsEyeView?.viewer, {
         timeout: 90_000,
