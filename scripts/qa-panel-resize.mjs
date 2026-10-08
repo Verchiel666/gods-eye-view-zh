@@ -106,6 +106,15 @@ async function main() {
     await hookRenderErrors(page);
 
     const boot = async () => {
+      // zh fork: pin English so the zh overlay does not rewrite the UI
+      // strings this gate asserts on (same reason as qa-street-level.mjs).
+      await page.evaluateOnNewDocument(() => {
+        try {
+          localStorage.setItem('gev-lang', 'en');
+        } catch {
+          /* keep going */
+        }
+      });
       await page.goto(`${url}/`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => window.__godsEyeView?.viewer, {
         timeout: 90_000,

@@ -372,6 +372,16 @@ async function clickPanelControl(page, selector, { timeout = 5_000 } = {}) {
 
 /** Load the app and clear the first-run dialog. */
 export async function boot(page, url) {
+  // zh fork: the localization overlay (public/zh.js) defaults to active and
+  // rewrites the very UI strings this gate asserts on in English; pin English
+  // so the gate exercises the upstream app, not the translation patch.
+  await page.evaluateOnNewDocument(() => {
+    try {
+      localStorage.setItem('gev-lang', 'en');
+    } catch {
+      /* private mode etc. — the patch stays active but the gate must run */
+    }
+  });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await clearFirstRun(page);
 }
