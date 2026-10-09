@@ -822,6 +822,38 @@
     'incomplete snapshot': '快照不完整',
     'lifecycle state requires reconciliation': '生命周期状态待校正',
 
+    // ===== 街景面板（2026-10-08 上游新增：src/ui/templates/layer-panels.html
+    //       STREET LEVEL 面板，Mapillary 街景查看器 + 数据源/影像筛选）=====
+    'STREET LEVEL': '街景',
+    'Turn Street Level on or off': '开关街景',
+    'Expand the street-level view (Esc shrinks it)': '展开街景视图（Esc 键缩小）',
+    'EXPAND': '展开',
+    'Image fit': '照片适配',
+    'Fit: show the whole photo, with dark bars where its shape differs from the frame':
+      '适应：显示完整照片，照片与视窗比例不同处以黑边填充',
+    'FIT': '适应',
+    'Fill: fill the frame edge to edge, cropping the photo':
+      '填满：照片铺满视窗边缘，超出部分裁剪',
+    'FILL': '填满',
+    'Camera follows view': '相机跟随视角',
+    'Camera follows view: move the globe camera wherever the street-level view looks':
+      '相机跟随视角：地球相机随街景视线移动',
+    'FOLLOW': '跟随',
+    'Close the image and deselect it on the map': '关闭照片并在地图上取消选中',
+    'Close the street-level image': '关闭街景照片',
+    "Open this image on the provider's site": '在数据源网站打开此照片',
+    'Street-level viewer': '街景查看器',
+    'Imagery providers': '影像数据源',
+    'PROVIDERS': '数据源',
+    'Imagery filters': '影像筛选',
+    'IMAGERY': '影像',
+    'Panorama filter': '全景筛选',
+    'ALL': '全部',
+    'FLAT': '平面',
+    'SINCE': '起始时间',
+    'ANY DATE': '不限日期',
+    'Coverage colours': '覆盖范围配色',
+
     // ===== 标注轮廓 / 地点导航 =====
     // src/annotations/screenAnnotationRenderer.js 把「名称 · Detailed outline
     // unavailable」拼进 SVG text；src/ui/locationNavigation.js 直接弹 toast。

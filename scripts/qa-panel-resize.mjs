@@ -100,6 +100,17 @@ async function main() {
   const monitors = [];
   try {
     const page = await browser.newPage();
+    // zh fork: pin English before ANY navigation so the zh overlay never
+    // activates — it rewrites the English strings this gate asserts on, and
+    // under swiftshader its MutationObserver load stalls boot (see
+    // qa-street-level.mjs). Must be registered before the first goto below.
+    await page.evaluateOnNewDocument(() => {
+      try {
+        localStorage.setItem('gev-lang', 'en');
+      } catch {
+        /* keep going */
+      }
+    });
     await page.setViewport(VIEWPORT);
     const errors = [];
     monitors.push(watchPage(page, { name: 'panel', errors }));
