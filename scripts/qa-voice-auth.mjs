@@ -90,6 +90,20 @@ try {
     .defaultBrowserContext()
     .overridePermissions(url.origin, ['microphone']);
   page = await browser.newPage();
+  // zh fork: the localization overlay (public/zh.js) defaults to active and
+  // rewrites COST UNKNOWN -> 费用未知, which the OAuth accounting assertion
+  // below compares against the upstream English literal. Pin English right
+  // after newPage() -- before any navigation -- so this gate exercises the
+  // upstream app, not the translation patch (same fix as qa-street-level.mjs;
+  // registered here rather than inside boot() per 299582c: a pin added after a
+  // preliminary goto arrives too late for the first load).
+  await page.evaluateOnNewDocument(() => {
+    try {
+      localStorage.setItem('gev-lang', 'en');
+    } catch {
+      /* private mode etc. — the patch stays active but the gate must run */
+    }
+  });
   await page.setViewport({ width: 1440, height: 900 });
   page.on('response', (response) => {
     const route = new URL(response.url()).pathname;

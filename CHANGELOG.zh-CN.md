@@ -6,9 +6,11 @@
 
 同步上游 22 个提交（33 文件，+2491/-38）后的一轮汉化补全，同时补上 2026-10-08 合并（`fd1288c`，街景图层）遗留的欠账。上游无冲突，汉化补丁文件独立。**本轮上游主要内容是 ChatGPT/Codex OAuth 语音认证（#621，实验性）与矢量瓦片原点跟随 TileJSON 配置（#933/#935）**。本轮真正的重头戏是发现并堵住了覆盖率门槛的**第二片结构性盲区**。
 
+⚠ 本轮与 origin 上已发布的 **PR #1（`1bcb13a` + `299582c`，2026-10-08）撞车**：那个分支已经补过街景面板的 26 条静态词条，并给 `qa-street-level.mjs` / `qa-panel-resize.mjs` 两个浏览器门槛 pin 了英文。处理方式见「同步记录」与「排错教训」，最终 26 条**以 PR #1 的译法为准**，本处只补它没覆盖的动态串与其余模块。
+
 ### 新增
 
-- **街景图层面板**（2026-10-08 合并引入，`src/ui/templates/layer-panels.html` + `src/ui/streetLevelPresentation.js`）— 面板标题 `STREET LEVEL`、查看器工具条（`EXPAND`/`SHRINK`/`FIT`/`FILL`/`FOLLOW`）、筛选（`PROVIDERS`/`IMAGERY`/`ALL`/`FLAT`）、SINCE 滑块九个档位（`ANY DATE`/`LAST MONTH`…`LAST 10 YEARS`/自定义 `LAST N DAYS`）、状态芯片（`KEY REQUIRED`/`KEY REJECTED`/`loading coverage...`）、数据源 chip 动态 title（`Mapillary imagery on|off`、密钥缺失与错误透传形态）、覆盖统计（`N images in this sequence · Esc clears`、`N sequences in view · click a line for its photos`）、全部 title/aria-label 长文案、`Image by ${creator}` 署名。
+- **街景图层的动态串与补充词条**（`src/ui/streetLevelPresentation.js` + `src/layers/streetLevel/index.js`）— 静态部分（`STREET LEVEL`/`EXPAND`/`FIT`/`FILL`/`ALL`/`SINCE` 等 26 条）已由 PR #1 收录，**不重复添加**（重复键会让后者静默覆盖前者）。本处补的是 PR #1 未覆盖的部分：状态芯片（`KEY REQUIRED`/`KEY REJECTED`/`loading coverage...`）、开关 title 的另两种形态（`Turn Street Level on|off`）、SINCE 九个档位（`ANY DATE`/`LAST MONTH`…`LAST 10 YEARS`/自定义 `LAST N DAYS`）、数据源 chip 动态 title（`Mapillary imagery on|off`、密钥缺失与错误透传形态）、覆盖统计（`N images in this sequence`、`N sequences in view`）、`Image by ${creator}` 署名、`SHRINK`、`Street-level image`、相机跟随不可用提示。用词跟随 PR #1 已发布的译法（`FIT`=适应 / `FILL`=填满 / photo=照片 而非图像）。
 - **ChatGPT OAuth 语音认证**（本轮上游 #621，`src/keySetup.js` + `src/voice/cloudVoiceAuth.js` + `src/voice/realtimeCost.js`）— 认证方式切换控件（`VOICE AUTH · API KEY|CHATGPT OAUTH`、`USE API KEY`/`USE CHATGPT OAUTH` 及 title）、登录流程全部状态行（检查中/过期重登/浏览器等待/超时/完成等 12 条）、费用读数 `COST UNKNOWN` 与 OAuth 用量 title 复合串（响应数/令牌数/字幕转写数）、模型档位提示（`Next session: … — this session stays on …`、`Voice model: … — click to switch to standard; applies next session`、`STANDARD|MINI applies next session`）、`Save failed (nnn).` 与透传型 `OAuth check failed: ${message}`。
 - **OAuth 服务端错误消息 17 条**（`server/providers/openai/codex-auth.js`、`realtime.js`）— 这批消息经 HTTP 响应体 `payload.error` 透传进浏览器状态行（`say(payload.error || '…')`），必须自己有词条，否则复合规则 `trKeep` 译不出会让整条放弃、操作员看到完整英文长串（zh-1.5.0 的 `TomTom flow timed out` 同款模式）。含本机限制三条（`ChatGPT OAuth is available only from this machine` 等）、跨源拒绝、存储路径不匹配、Codex 未安装、登录超时/未完成、auth.json 无可用令牌等。
 - **语音助手卡片**（`src/voice/control.js` 用 **innerHTML 内嵌 HTML**，自 2026-09-15 语音核心引入起就是英文——见下文盲区）— 卡片骨架全部文案（`VOICE`/`YOU`/`GEV`/`THIS`/`HERE`/`NOTES & SOURCES`/`VOICE SYSTEM ERROR`/`DISMISS`、aria-label 五条）、步骤状态（`, done`/`, failed` 等带前导逗号的拼接形态）、步骤标签（`STEP_LABELS` 七条 + `progressStepLabel` 的 `${base}: ${label}` 复合形态）、计划步骤（`Mark ${place} +N`/`Fly to ${place}`/`Nearest ${noun} to ${place}`）、结果标题（`View state`/`Nothing marked`/`Marked N places`/`${count} ${noun} in frame`/`Frame ${target}`/`${label} on|off`）、明细行（`Within N km of the view`/`Altitude N feet`/`N km from ${place}`/`Camera range N km`/`Labels on`/`Source: ${label}`/`Not found: ${list}`）。
@@ -18,13 +20,14 @@
 - **太空任务面板控件提示**（`src/layers/launches/panel.js`）— `Show all missions`/`Previous mission`/`Next mission`/`Deselect mission`/`Replay speed multiplier` 等 title/aria-label，`+N additional payload records` 溢出计数。
 - **图层显示名 13 条**（`layer.name` 与 `layerPanel.js` 的 `PANEL_LABELS`）— `Live Vessels`/`Bike Share`/`Cameras`/`Street Level`/`Mapped ALPR Cameras`/`Data Centers`/`Active Fires`/`Fire Perimeters`/`Earthquakes (24h)`/`Directions`/`Satellites`/`Transit`/`Wind`。图层名同时是语音卡片 `${label} on|off` 规则的前件（trKeep 严格匹配），缺词条会连带整条复合串放弃。
 - **面板拖拽调宽提示**（`src/ui/panelPositionControls.js`）— `Drag to resize · double-click the header to snap back`。
-- 词典从 841 条扩充到 **1031 条**（+190），动态串规则 139 → **177 条**（+38）。
+- 词典从 841 条（zh-1.5.0）扩充到 **1031 条**：其中 26 条来自 PR #1，**本轮净增 164 条**（相对 PR #1 基线 867 实测）。动态串规则 139 → **177 条**（+38，全部为本轮新增，PR #1 未动规则）。
 
 ### 修复（一处真 bug + 一片从未被扫到的盲区）
 
 - **尾随分隔符标签串整串漏译（真 bug，合并前就存在）** — 太空任务面板把字段写成 `STATUS · <b>值</b>`，标签文本节点是 `'STATUS · '`（带尾随空格）。`lookup()` 开头 `trim()` 把空格吃掉后 `' · '` 不再完整，`translateSegments` 的分隔符检测够不着，整串原样留在界面上——7 个字段标签全是这个形态，用户长期看到「STATUS · 正常」半英半中。修法：`lookup()` 单开尾随分隔符分支，只译标签部分，分隔符与尾随空白原样保留（那个空格是 `<b>` 前的排版间距）。已反向验证：禁用该分支 → 7 条全部退回原文 + 新门槛精确报红。
 - **覆盖率门槛的第二片结构性盲区：JS 内嵌 HTML 模板** — 静态门槛只扫 `src/ui/templates/*.html`，但上游有 5 个模块把整块面板标记写成 JS 里的 innerHTML 模板字符串（语音控件/HUD/太空任务/军事情报/洪水事件），共 **101 条可见文案**，门槛一条也扫不到。语音卡片自 2026-09-15 引入起就是英文，欠账潜伏 3 周多，期间门槛一直全绿。军事情报面板更是双层盲区：markup 存变量再赋值（匹配不到 `innerHTML = \`` 形态）+ 文案藏在 `${cond ? 'A' : 'B'}` 插值里（标签间文本正则刻意排除 `{}`）。本轮全部补齐并固化为新门槛（见下）。
-- **新增 `'ALL'` 等短词前按纪律做了撞车核查** — 电台调谐器复合串 `ALL · DRAG THE NEEDLE` 整串在词典（dictOnly 精确匹配优先，不会退化）；小写 `all`/`fit`/`fill`/`flat`/`done` 等经 grep 确认不作为独立可见文本出现（大小写兜底不会误伤）；Material Symbols 图标清单 32 个连字与本轮新增词零重合，JS 动态换图标处（`cockpitLayout.js` 的 chevron/right_panel 系列）也不在新增词内。防御性把这批常用词全部加进图标保护测试清单（22 个新词），DOM 容器拦截验证有效。
+- **新增 `'ALL'` 等短词前按纪律做了撞车核查** — 电台调谐器复合串 `ALL · DRAG THE NEEDLE` 整串在词典（dictOnly 精确匹配优先，不会退化）；小写 `all`/`fit`/`fill`/`flat`/`done` 等经 grep 确认不作为独立可见文本出现（大小写兜底不会误伤）；Material Symbols 图标清单 32 个连字与本轮新增词零重合，JS 动态换图标处（`cockpitLayout.js` 的 chevron/right_panel 系列）也不在新增词内。防御性把这批常用词全部加进图标保护测试清单（21 个新词，清单 18 → 39），DOM 容器拦截验证有效。
+- **本轮上游新增的语音 QA 脚本会被汉化覆盖层绊倒（PR #1 同类问题的延续）** — `scripts/qa-voice-auth.mjs:215` 断言 `meter.text === 'COST UNKNOWN'`，而本轮正好把 `COST UNKNOWN` 译成了「费用未知」，汉化层默认激活会改写这个 DOM 文本使断言失败。已按 PR #1 确立的模式给它 `evaluateOnNewDocument` pin `gev-lang=en`，且遵循 `299582c` 的教训把 pin 紧跟 `newPage()`（不能放在预置 goto 之后）。**注意它是手动运行的 QA 脚本，不在 CI、也无 npm script 入口**（CI 的浏览器门槛只有已 pin 的 street-level / panel-resize 两个），所以不修也不会让 CI 变红——但留着就是一次手动排查的坑。同批的 `qa-voice-auth-focus.mjs` 断言全是布尔与选择器匹配、`activeLabel` 只进 diagnostic 日志，不受翻译影响，未改。
 
 ### 门槛强化
 
@@ -40,6 +43,9 @@
 - **把扫描候选当缺口清单直接补，会制造重复键。** 本轮曾把 4 条既有词条（250 km window 两条 title、Cancel/Pause replay）又加了一遍——探针当时明明报「已译」，我却照着扫描器的原始输出补。重复键虽被门槛抓住，但暴露了流程错误：**扫描器输出是候选，必须先过探针筛一遍再动手**。
 - **修通用逻辑前先跑存量测试，别凭直觉写宽规则。** 第一版给裸 `N km`/`N feet` 写了规则，立即打爆「量词段不得波及单位数据」与「专有名词防过宽」两道存量门槛（`3.2 km` 是刻意保留的数据段）。正确姿势是把单位翻译写进带语境前缀的整串规则（`Within N km of the view`），存量门槛的断言就是设计意图文档，红了的瞬间先读测试注释再改规则。
 - **Windows 下 `path.relative` 返回反斜杠** — 新门槛的「已知文件必须被扫到」自检第一次跑就全红，原因是期望值写的 POSIX 路径与 `src\voice\control.js` 不匹配。采集器输出统一 `split(path.sep).join('/')`。跨平台测试的哨兵断言要注意路径形态。
+- **推送前必须查 `git ls-remote origin`，本地缓存会骗你。** 本轮准备推送时发现远程 `origin/main` 已经是 `16eb796`（PR #1 的 merge），而本地缓存还停在 `fd1288c`——另一个实例在前一天已经补过街景词条并修了 CI。直接推就会非快进被拒，或者更糟：强推覆盖掉别人已发布的修复。这是 MEMORY.md 里「守门纪律」第 3 条的实例（状态可能被并发实例改变），但过去只在 upstream 侧防过，**origin 侧同样要防**。
+- **Git 自动合并成功 ≠ 词典没有重复键。** 双方在**不同位置**添加了同一批键，git 视为两处独立新增、干净合并、零冲突——但 JS 对象字面量里重复键会让后者静默覆盖前者。这次是门槛的「词典无重复键」测试抓住了 26 个重复键。合并别人的汉化提交后必须跑这道门槛，不能只看 merge 是否报冲突。
+- **撞车时以已发布的译文为准，不要凭「我的译法更好」去改。** PR #1 的 `FIT`=适应 / `FILL`=填满 / photo=照片 已经推到 origin，我把自己的 `完整`/`铺满`/`图像` 全部删掉、跟随它的用词，并把自己规则里的 `图像来源` 同步改成 `照片来源`（规则译文与测试断言要一起改，否则门槛报红）。术语一致性比个人偏好重要，已发布的字符串是既成事实。
 
 ### 同步记录
 
@@ -47,8 +53,9 @@
 - 合并无冲突，merge 提交 `8d7fb93`（parents `fd1288c` + `6be2559`）。
 - 依赖检查：`package.json` / `package-lock.json` **均未变** → 无需 `npm install`；**本轮上游未动任何模板**（`git diff fd1288c 8d7fb93 -- src/ui/templates index.html` 为空）。静态条数 387 → 413 的 26 条增量全部来自 10-08 那次 `fd1288c` 合并（该轮合并后没有跟汉化提交），本轮一并补齐。用 `90f2a45`（zh-1.5.0）的模板跑同一采集器实测得 387，与门槛首跑的 26 条缺口清单双向印证。
 - 完整验证：`npm test` **6239 / 6228 pass / 1 fail / 10 skip**——唯一失败是本轮上游新增的 `src/codexOauthRealtime.test.mjs`（Windows 路径分隔符平台缺陷：期望 `/home/fixture/.local/bin/codex`，实际 `path.join` 在 win32 产出反斜杠路径）。**已用 stash 对照法确证与汉化无关**：暂存本 fork 全部改动后在纯 merge 状态跑同一文件，同样 7/8 通过 1 失败。属上游测试的平台兼容 bug，不在本 fork 修复范围。
-- `npm run build` ✓（15.5s）；`check:boundaries` ✓；汉化门槛 24/24 全绿。
-- 探针实测：内嵌 HTML 候选 103 条，以 HEAD 版 `zh.js` 实测的**修复前基线为命中 34 / 未命中 69**，修复后命中 **102 / 未命中 1**（唯一未译 `escapeHtml(name)).join('` 是箭头函数被文本正则误切的扫描伪影，非真实文案）。街景/语音/费用动态串 51 条候选实测修复后命中 48 / 未命中 3，三条未译均为**刻意保留**：`MAPILLARY ↗`（品牌名 + 外链箭头）、`360° · 128° · 2026-09-01`（纯数据段，translateSegments 按纪律保留）、`01 · Rasuwagadhi witness`（序号已译出，地名为专有名词）。
+- `npm run build` ✓（16.5s）；`check:boundaries` ✓；`npm run format:check` ✓（1303 文件，`scripts/qa-voice-auth.mjs` 受 format-scope 管辖，pin 改动已验证格式合规）；汉化门槛 24/24 全绿。
+- **推送前的并发撞车处理**：准备推送时 `git ls-remote origin` 发现远程 `origin/main` 已是 `16eb796`（PR #1 的 merge 提交，本地缓存还停在 `fd1288c`）。先 `git fetch origin` + `git merge origin/main`（无冲突，git 自动合并），但门槛的「词典无重复键」测试立刻抓出 **26 个重复键**——PR #1 与本轮在不同位置各加了一份街景词条。以 PR #1 已发布的译法为准，删除本轮重复的 26 条、保留本轮独有的动态串与其余模块词条，并统一术语（图像→照片）。
+- 探针实测：内嵌 HTML 候选 103 条，以合并前 HEAD 版 `zh.js` 实测的**修复前基线为命中 34 / 未命中 69**，修复后命中 **102 / 未命中 1**（唯一未译 `escapeHtml(name)).join('` 是箭头函数被文本正则误切的扫描伪影，非真实文案）。街景/语音/费用动态串 51 条候选实测修复后命中 48 / 未命中 3，三条未译均为**刻意保留**：`MAPILLARY ↗`（品牌名 + 外链箭头）、`360° · 128° · 2026-09-01`（纯数据段，translateSegments 按纪律保留）、`01 · Rasuwagadhi witness`（序号已译出，地名为专有名词）。
 - 四次反向验证全部干净（删词条/禁分支/退化采集器/禁三元层 → 对应断言精确报红；每次先 `node --check` 排除级联失败；还原 → 24/24）。
 
 ## zh-1.5.0 — 2026-09-29

@@ -862,45 +862,23 @@
     'Search failed': '搜索失败',
     'Fly to a POI first': '请先飞往一个兴趣点',
 
-    // ===== 街景图层（street-level）面板 =====
-    // 2026-10-08 上游合并引入（src/ui/templates/layer-panels.html + streetLevelPresentation.js）。
-    // 静态部分被覆盖率门槛抓到，动态部分（SINCE 档位、chip title、覆盖统计）只能靠规则。
-    'STREET LEVEL': '街景',
-    'Street-level viewer': '街景查看器',
-    'Street-level image': '街景图像',
-    'EXPAND': '展开', 'SHRINK': '缩小',
-    'FIT': '完整', 'FILL': '铺满', 'FLAT': '平面',
-    // 'ALL' 是全景筛选的第一个档位（data-sl-pano="all"）。
-    // 与电台调谐器的复合串 'ALL · DRAG THE NEEDLE' 不冲突：
-    // dictOnly 精确匹配优先，整串先命中，不会退化成「全部 · DRAG THE NEEDLE」。
-    // 小写 'all' 已 grep 确认不作为可见文本单独出现（大小写兜底不会误伤）。
-    'ALL': '全部',
-    'FOLLOW': '跟随', 'PROVIDERS': '数据源', 'IMAGERY': '影像',
-    'SINCE': '起始时间', 'ANY DATE': '不限日期',
-    'Image fit': '图像适配方式',
-    'Imagery providers': '影像数据源',
-    'Imagery filters': '影像筛选条件',
-    'Panorama filter': '全景筛选',
-    'Coverage colours': '覆盖配色',
-    'Camera follows view': '相机跟随视角',
-    'Close the street-level image': '关闭街景图像',
-    'Turn Street Level on or off': '开启或关闭街景图层',
-    'Turn Street Level on': '开启街景图层',
-    'Turn Street Level off': '关闭街景图层',
-    'Expand the street-level view (Esc shrinks it)': '展开街景视图（按 Esc 缩小）',
-    'Fit: show the whole photo, with dark bars where its shape differs from the frame':
-      '完整：显示整张照片，与画框比例不一致处以黑边填充',
-    'Fill: fill the frame edge to edge, cropping the photo':
-      '铺满：照片铺满画框边缘，超出部分裁切',
-    'Camera follows view: move the globe camera wherever the street-level view looks':
-      '相机跟随视角：街景朝哪看，地球相机就跟到哪',
-    'Camera follow needs the Google 3D map: choose Google 3D under MAP SOURCE':
-      '相机跟随需要 Google 3D 地图：请在「地图源」中选择 Google 3D',
-    'Close the image and deselect it on the map': '关闭图像并在地图上取消选中',
-    "Open this image on the provider's site": '在数据源网站打开这张图像',
+    // ===== 街景图层的动态串与补充词条（streetLevelPresentation.js / index.js）=====
+    // 静态部分（STREET LEVEL / EXPAND / FIT / FILL / ALL / SINCE 等 26 条）已由
+    // 1bcb13a（PR #1）收录在上方「街景面板」段落，本处**不重复**——重复键会让
+    // 后者静默覆盖前者，且门槛测试会报红。这里只补它没覆盖的部分：状态芯片、
+    // SINCE 九个档位、覆盖统计、Mapillary 错误前缀、相机跟随不可用提示。
+    // 用词跟随 PR #1 已发布的译法（FIT=适应 / FILL=填满 / photo=照片 而非图像）。
+    'Street-level image': '街景照片',
+    'SHRINK': '缩小',
     // 状态芯片（presentStatus）
     'KEY REJECTED': '密钥被拒', 'KEY REQUIRED': '需要密钥',
     'loading coverage...': '正在加载覆盖范围...',
+    // 开关 title 的另两种形态（PR #1 只收了 on-or-off 合并态）
+    'Turn Street Level on': '开启街景图层',
+    'Turn Street Level off': '关闭街景图层',
+    // 相机跟随不可用时的替代提示
+    'Camera follow needs the Google 3D map: choose Google 3D under MAP SOURCE':
+      '相机跟随需要 Google 3D 地图：请在「地图源」中选择 Google 3D',
     // 覆盖统计（presentMeta）
     'Switch a provider on to draw its coverage.': '开启任一数据源即可绘制其覆盖范围。',
     'Loading this sequence…': '正在加载该序列…',
@@ -1440,10 +1418,12 @@
       return '需要 ' + m[1] + ' — 请在「数据源配置」中添加';
     }],
     // 覆盖统计（presentMeta）。数字经 toLocaleString 带千分位逗号，捕获组要允许逗号。
-    [/^([\d,]+) images in this sequence$/, function (m) { return '本序列有 ' + m[1] + ' 张图像'; }],
+    [/^([\d,]+) images in this sequence$/, function (m) { return '本序列有 ' + m[1] + ' 张照片'; }],
     [/^([\d,]+) sequences in view$/, function (m) { return '视野内有 ' + m[1] + ' 条序列'; }],
-    // 图像署名：`Image by ${creator}`（作者名保留原文）
-    [/^Image by (.+)$/, function (m) { return '图像来源 ' + m[1]; }],
+    // 照片署名：`Image by ${creator}`（作者名保留原文）
+    // 术语跟随 PR #1（1bcb13a）已发布的译法：街景语境一律用「照片」而非「图像」，
+    // 与 'Image fit'→照片适配、'Close the street-level image'→关闭街景照片 保持一致。
+    [/^Image by (.+)$/, function (m) { return '照片来源 ' + m[1]; }],
     // SINCE 读数：`LAST 45 DAYS`（自定义天数档位，SINCE_STOPS 之外的分支）
     [/^LAST ([\d,]+) DAYS$/, function (m) { return '近 ' + m[1] + ' 天'; }],
     // 街景图像右上角读数由 ' · ' 拼接（`360° · 128° · 2026-09-01`），

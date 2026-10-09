@@ -1251,9 +1251,9 @@ test('街景 / OAuth 语音 / 语音卡片动态串必须译出', () => {
     ['Needs MAPILLARY_TOKEN — add it in Provider Settings', '需要 MAPILLARY_TOKEN — 请在「数据源配置」中添加'],
     ['Mapillary: Needs MAPILLARY_TOKEN — add it in Provider Settings', 'Mapillary: 需要 MAPILLARY_TOKEN — 请在「数据源配置」中添加'],
     // 覆盖统计（数字带千分位逗号）
-    ['12 images in this sequence', '本序列有 12 张图像'],
+    ['12 images in this sequence', '本序列有 12 张照片'],
     ['1,234 sequences in view', '视野内有 1,234 条序列'],
-    ['Image by Geo George Shadrach', '图像来源 Geo George Shadrach'],
+    ['Image by Geo George Shadrach', '照片来源 Geo George Shadrach'],
     ['LAST 45 DAYS', '近 45 天'],
 
     // OAuth 语音认证（keySetup.js 的 say → statusLine.textContent）
