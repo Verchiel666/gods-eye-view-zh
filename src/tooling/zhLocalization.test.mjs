@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
@@ -195,13 +195,104 @@ function collectHtmlStrings() {
   return out;
 }
 
+/**
+ * 采集 JS 源码里内嵌 HTML 模板中的可见文案。
+ *
+ * ⚠ 为什么需要它（2026-10-09 实测教训）：
+ * collectHtmlStrings() 只看 index.html + src/ui/templates/*.html。但上游有多个
+ * 模块把整块面板标记写成 JS 里的 innerHTML 模板字符串，例如：
+ *   - src/voice/control.js        语音助手控件与语音卡片（2026-09-15 引入）
+ *   - src/hud.js                  HUD 抬头显示
+ *   - src/layers/launches/panel.js 太空任务面板
+ *   - src/layers/awareness/panel.js 军事目标情报面板
+ *   - src/data/bhoteKoshiEvent.js 尼泊尔洪水事件面板
+ * 这些文案浏览器确实渲染，但静态门槛一条也扫不到 —— 语音卡片自引入起就是
+ * 英文，欠账潜伏了 3 周，门槛一路 21/21 全绿。
+ *
+ * 两层盲区，必须都覆盖：
+ *   1. **变量间接赋值** —— awareness/panel.js 先 `const markup = \`...\`` 再
+ *      `panel.innerHTML = markup`。只匹配 `innerHTML = \`...\`` 会整块漏掉，
+ *      因此这里不按赋值形态匹配，改为抓所有「含 HTML 标签的反引号模板」。
+ *      代价是可能扫到非 innerHTML 的模板，但下面只提取属性值与标签间文本，
+ *      不会误伤（纯 JS 模板里的字符串不带 HTML 标签）。
+ *   2. **插值里的三元字面量** —— `${layerState.enabled ? 'CONTEXT READY' : 'GLOBAL CONTEXT OFF'}`
+ *      文案藏在 `${}` 内部。标签间文本正则 />([^<>{}]+)</ 刻意排除了 `{}`，
+ *      这类串必须单独抓，否则开关文案永远漏。
+ *
+ * 已知噪声：箭头函数 `names.map((name) => escapeHtml(name)).join('<br>')`
+ * 会让文本正则匹配到 `escapeHtml(name)).join('` 这类代码碎片。用 isTranslatable
+ * 之外的形状过滤（含 `(` / `=>` / `'` 的碎片）剔除，见下方 KEEP_RE。
+ */
+function collectInlineHtmlStrings() {
+  const SRC_ROOT = path.join(REPO_ROOT, 'src');
+  const files = [];
+  (function walk(dir) {
+    for (const entry of readdirSync(dir)) {
+      const full = path.join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.js$/.test(entry) && !/\.test\.m?js$/.test(entry)) files.push(full);
+    }
+  })(SRC_ROOT);
+
+  const HTMLISH = /<[a-z][a-z0-9-]*[\s>/]/i;
+  // 代码碎片过滤：真文案不会长成这样
+  const CODE_FRAGMENT = /[()='`]|=>|\bjoin\b|\bmap\b|\bfunction\b/;
+  const groups = [
+    { name: 'title', re: /\btitle\s*=\s*"([^"${]+)"/g },
+    { name: 'text', re: />([^<>{}]+)</g },
+    { name: 'placeholder', re: /\bplaceholder\s*=\s*"([^"${]+)"/g },
+    { name: 'aria-label', re: /\baria-label\s*=\s*"([^"${]+)"/g },
+  ];
+
+  const out = [];
+  const seen = new Set();
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    if (!source.includes('innerHTML')) continue;
+    const blocks = [...source.matchAll(/`([\s\S]*?)`/g)]
+      .map((m) => m[1])
+      .filter((b) => HTMLISH.test(b));
+    if (!blocks.length) continue;
+    const html = blocks.join('\n');
+
+    const items = new Set();
+    for (const { name, re } of groups) {
+      for (const m of html.matchAll(re)) {
+        const t = decodeEntities(m[1]).replace(/\s+/g, ' ').trim();
+        if (!isTranslatable(t) || CODE_FRAGMENT.test(t)) continue;
+        if (seen.has(t)) continue;
+        seen.add(t);
+        items.add(t);
+      }
+    }
+    // 插值里的三元字面量（第二层盲区）
+    for (const m of html.matchAll(/\?\s*'([^']+)'\s*:\s*'([^']+)'/g)) {
+      for (const candidate of [m[1], m[2]]) {
+        const t = candidate.replace(/\s+/g, ' ').trim();
+        if (!isTranslatable(t) || CODE_FRAGMENT.test(t)) continue;
+        if (seen.has(t)) continue;
+        seen.add(t);
+        items.add(t);
+      }
+    }
+    if (items.size) {
+      // Windows 下 path.relative 返回反斜杠，与断言里写的 POSIX 路径不匹配。
+      // 统一成正斜杠，否则自检 2 会把「扫到了」误判成「没扫到」。
+      out.push({
+        file: path.relative(REPO_ROOT, file).split(path.sep).join('/'),
+        items: [...items],
+      });
+    }
+  }
+  return out;
+}
+
 test('zh.js 语法有效且可加载', () => {
   const { dict } = loadPatch();
   assert.ok(dict && typeof dict === 'object', '词典未加载');
   const size = Object.keys(dict).length;
   assert.ok(size >= 400, `词典规模异常缩水：${size} 条（期望 >= 400）`);
 });
-
 test('词典无重复键（重复会让后者静默覆盖前者）', () => {
   const source = readFileSync(PATCH_PATH, 'utf8');
   const block = source.slice(
@@ -250,6 +341,84 @@ test('静态文案 100% 覆盖（同步上游后的覆盖率门槛）', () => {
     missing,
     [],
     `有 ${missing.length}/${total} 条静态文案未汉化（上游可能改了文案，需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
+  );
+});
+
+/**
+ * JS 内嵌 HTML 门槛：补齐静态门槛扫不到的第二片盲区。
+ *
+ * 存在理由见 collectInlineHtmlStrings() 的注释。语音卡片、HUD、太空任务面板、
+ * 军事情报面板、洪水事件面板全部走 innerHTML，静态门槛一条也扫不到。
+ *
+ * 防假绿的三道自检（吸取 2026-09-28「门槛自身失效」与 2026-09-29「虚构断言」两次教训）：
+ *   1. 提取条数下限：内嵌文案总量必须 > 60 条。若上游改了注入方式（如换成
+ *      createElement + textContent），提取数会骤降 → 下限触发，提示同步更新采集器。
+ *   2. 采集器必须真扫到已知的 5 个文件：写死文件名断言，防止「扫不到任何文件
+ *      → 循环体一次都没进 → missing 恒为空 → 门槛假绿」。
+ *   3. 三层盲区各留一条已知文案做正向对照：直接 innerHTML 模板（语音卡片）、
+ *      变量间接赋值（军事情报面板的开关文案）、插值三元字面量。任一层采集器
+ *      退化，对应断言会精确报红，而不是让整道门槛静默变绿。
+ */
+test('JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区）', () => {
+  const { lookup } = loadPatch();
+  const groups = collectInlineHtmlStrings();
+  const byFile = new Map(groups.map((g) => [g.file, g.items]));
+
+  // 自检 1：提取条数下限
+  const total = groups.reduce((sum, g) => sum + g.items.length, 0);
+  assert.ok(
+    total > 60,
+    `JS 内嵌 HTML 提取异常：仅 ${total} 条（期望 > 60）。`
+      + '上游可能改了 DOM 注入方式（不再用 innerHTML + 反引号模板），'
+      + '请检查 collectInlineHtmlStrings() 是否还能扫到文案，否则本门槛会假绿',
+  );
+
+  // 自检 2：5 个已知的内嵌 HTML 模块必须都被扫到
+  const expectedFiles = [
+    'src/voice/control.js',
+    'src/hud.js',
+    'src/layers/launches/panel.js',
+    'src/layers/awareness/panel.js',
+    'src/data/bhoteKoshiEvent.js',
+  ];
+  const notScanned = expectedFiles.filter((f) => !byFile.has(f));
+  assert.deepEqual(
+    notScanned,
+    [],
+    `以下已知内嵌 HTML 模块没被采集器扫到（采集器退化 → 门槛会假绿）：${notScanned.join(', ')}。`
+      + ' 请检查它们是否改了注入方式，并同步更新 collectInlineHtmlStrings()',
+  );
+
+  // 自检 3：三层盲区各留一条正向对照（这些串必须在提取结果里）
+  const allItems = new Set(groups.flatMap((g) => g.items));
+  const sentinels = [
+    // 直接 innerHTML 模板
+    ['src/voice/control.js', 'VOICE SYSTEM ERROR'],
+    // 变量间接赋值（const markup = `...` 再赋给 innerHTML）
+    ['src/layers/awareness/panel.js', 'Global Context navigation'],
+    // 插值三元字面量 ${cond ? 'A' : 'B'}
+    ['src/layers/awareness/panel.js', 'CONTEXT READY'],
+    ['src/layers/awareness/panel.js', 'GLOBAL CONTEXT OFF'],
+  ];
+  for (const [file, text] of sentinels) {
+    assert.ok(
+      allItems.has(text),
+      `采集器漏了已知文案 ${JSON.stringify(text)}（${file}）——`
+        + '某一层盲区的提取退化，门槛会假绿。请检查 collectInlineHtmlStrings()',
+    );
+  }
+
+  // 正式覆盖断言
+  const missing = [];
+  for (const { file, items } of groups) {
+    for (const text of items) {
+      if (lookup(text) === null) missing.push(`${file}: ${JSON.stringify(text)}`);
+    }
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    `有 ${missing.length}/${total} 条 JS 内嵌 HTML 文案未汉化（需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
   );
 });
 
@@ -701,6 +870,14 @@ test('Material Symbols 图标连字不得被翻译（译了图标就退化成方
     // 2026-09-28 本轮往词典加了 'TUNE'（SDR 调谐按钮），而 Material Symbols
     // 恰好有 tune 图标；词典精确匹配优先 + DOM 容器拦截应确保图标不被误译。
     'tune',
+    // 2026-10-09 本轮为街景/语音/HUD 补的词条里有大量常用词，Material Symbols
+    // 存在同名或近名图标（fit_screen / expand / done / plan / work 等）。
+    // 更危险的是 dictOnly 的大小写兜底：词典键是全大写 'FIT'/'FILL'/'ALL'/'DONE'，
+    // 小写形态 'fit'/'fill'/'all'/'done' 也会被译出 —— 若哪天上游把图标连字
+    // 写成小写，没有 DOM 容器拦截就会退化。这里防御性锁定。
+    'fit', 'fill', 'all', 'expand', 'follow', 'flat', 'since', 'shrink',
+    'voice', 'done', 'previous', 'plan', 'stage', 'cause', 'working', 'manage',
+    'notes', 'sources', 'dismiss', 'providers', 'imagery',
   ];
 
   for (const cls of ['material-symbols-outlined', 'pp-icon material-symbols-outlined',
@@ -995,5 +1172,156 @@ test('小写状态词的 dictOnly 大小写兜底：锁定行为并确认其安�
   // 例如手绘面板的 Clear（清除）与气象读数 CLEAR（晴）——历史血泪教训。
   assert.equal(lookup('Clear'), '清除');
   assert.notEqual(lookup('Clear'), lookup('CLEAR'));
+});
+
+/**
+ * 尾随分隔符标签串必须译出（太空任务面板的字段标签）。
+ *
+ * src/layers/launches/panel.js 把字段写成 `STATUS · <b data-mission-status></b>`，
+ * 于是标签的文本节点是 `'STATUS · '`（带尾随空格）。补丁的 lookup() 开头会 trim，
+ * 空格被吃掉后 `' · '` 不再完整 → translateSegments 的分隔符检测够不着 →
+ * 整串原样留在界面上。7 个字段标签全是这个形态，用户看到的就是
+ * 「STATUS · 正常」这种半英半中。
+ *
+ * 修法是 lookup() 里单开一个尾随分隔符分支：只译标签部分，分隔符与尾随空白
+ * 原样保留（那个空格是 `<b>` 前的排版间距）。反向验证过：把该分支禁用后
+ * 下面 7 条全部退回原文。
+ *
+ * 注意别把它「简化」掉——曾经有人以为 trim 之后再查词典就够了，
+ * 那样 `'STATUS ·'`（trim 后无尾随空格）能译，但真实 DOM 里的 `'STATUS · '`
+ * 经 translateNode 拿到的是**未 trim 的原始 data**，行为并不一致。
+ */
+test('尾随分隔符标签串（太空任务面板字段）必须译出', () => {
+  const { lookup, translateNode } = loadPatch();
+  const cases = [
+    ['STATUS · ', '状态 · '],
+    ['ASCENT PATH · ', '上升轨迹 · '],
+    ['CURRENT DISTANCE FROM EARTH · ', '当前离地距离 · '],
+    ['LAUNCH SITE · ', '发射场 · '],
+    ['LAUNCH TIME · ', '发射时间 · '],
+    ['ORBIT · ', '轨道 · '],
+    ['SATELLITE SPEED · ', '卫星速度 · '],
+  ];
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) {
+      failures.push(`${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`);
+    }
+  }
+  assert.deepEqual(failures, [], `尾随分隔符标签串未译出：\n  ${failures.join('\n  ')}`);
+
+  // 尾随空白必须原样保留（<b> 前的排版间距，丢了会让标签与数值贴在一起）
+  assert.equal(lookup('STATUS · ').endsWith('· '), true, '尾随空格被吃掉了');
+
+  // 幂等：译文回写后不得被反复改写（MutationObserver 抖动防线）
+  const node = textNode('STATUS · ');
+  for (let i = 0; i < 5; i += 1) translateNode(node);
+  assert.equal(node.writes, 1, `尾随分隔符串写入 ${node.writes} 次（应 1 次）→ ${JSON.stringify(node.data)}`);
+
+  // 反向对照：不带尾随分隔符的普通复合串仍走 translateSegments，行为不变
+  assert.equal(lookup('ASCENT PATH · 3.2 km'), '上升轨迹 · 3.2 km');
+});
+
+/**
+ * 街景 / OAuth 语音 / 语音卡片的动态串必须译出。
+ *
+ * 2026-10-08 上游合并引入街景图层，2026-10-09 引入 ChatGPT OAuth 语音认证（#621）。
+ * 这批串全是 JS 现拼，静态门槛（扫 src/ui/templates/*.html）与内嵌 HTML 门槛
+ * （扫反引号模板）都看不到，只能靠规则覆盖。
+ *
+ * 三个必须留意的点：
+ *   1. **语音只译显示串，不译播报串** —— speech.js 里 `display.title` / `lines`
+ *      / `notes` 进 DOM，而 `say` 是给语音模型念的内容，刻意不译（上游语音
+ *      提示词全是英文语境）。下面的用例都取自 display 路径。
+ *   2. **透传错误消息** —— keySetup.js 的 `OAuth check failed: ${error?.message}`
+ *      把服务端 codex-auth.js 的消息拼进复合串，规则用 trKeep 严格匹配，
+ *      后半段译不出会**整条放弃**。所以那批服务端消息必须自己有词条。
+ *   3. **`Frame ${target}` 与 `N ${noun} in frame` 的取值域不同** —— 前者来自
+ *      actionSchemas.js 的 frame_overhead 枚举（flights/military/satellites/vessels），
+ *      后者来自 speech.js 的 LAYER_NOUNS（aircraft/ships/...）。写混了规则会永远匹配不上。
+ */
+test('街景 / OAuth 语音 / 语音卡片动态串必须译出', () => {
+  const { lookup } = loadPatch();
+  const cases = [
+    // 街景数据源 chip 的 title（`${provider.name} imagery on|off`）
+    ['Mapillary imagery on', 'Mapillary 影像已开启'],
+    ['Mapillary imagery off', 'Mapillary 影像已关闭'],
+    // 密钥缺失提示（keySetupCore.mjs 的 keySetupRequirement）
+    ['Needs MAPILLARY_TOKEN — add it in Provider Settings', '需要 MAPILLARY_TOKEN — 请在「数据源配置」中添加'],
+    ['Mapillary: Needs MAPILLARY_TOKEN — add it in Provider Settings', 'Mapillary: 需要 MAPILLARY_TOKEN — 请在「数据源配置」中添加'],
+    // 覆盖统计（数字带千分位逗号）
+    ['12 images in this sequence', '本序列有 12 张图像'],
+    ['1,234 sequences in view', '视野内有 1,234 条序列'],
+    ['Image by Geo George Shadrach', '图像来源 Geo George Shadrach'],
+    ['LAST 45 DAYS', '近 45 天'],
+
+    // OAuth 语音认证（keySetup.js 的 say → statusLine.textContent）
+    ['VOICE AUTH · CHATGPT OAUTH', '语音认证 · ChatGPT OAuth'],
+    ['USE CHATGPT OAUTH', '改用 ChatGPT OAuth'],
+    ['Checking local ChatGPT OAuth sign-in…', '正在检查本机 ChatGPT OAuth 登录状态…'],
+    // 透传型复合串：后半段是服务端消息，两者都必须有词条
+    ['OAuth check failed: Could not start ChatGPT sign-in', 'OAuth 检查失败: 无法启动 ChatGPT 登录'],
+    ['Save failed: ChatGPT sign-in is unavailable', '保存失败: ChatGPT 登录不可用'],
+    ['Save failed (500).', '保存失败（HTTP 500）。'],
+
+    // 费用读数（realtimeCost.js，模型 ID 与金额保留原文）
+    ['COST UNKNOWN', '费用未知'],
+    ['Next session: gpt-realtime-mini — this session stays on gpt-realtime', '下次会话: gpt-realtime-mini — 本次会话仍使用 gpt-realtime'],
+    ['Voice model: gpt-realtime-mini — click to switch to standard; applies next session', '语音模型: gpt-realtime-mini — 点击切换到标准档；下次会话生效'],
+    ['Estimated session cost on gpt-realtime — 3 response(s). Warns at $1.00, ends the session at $5.00.', 'gpt-realtime 上的会话费用估算 — 已产生 3 次响应。达到 $1.00 时告警，达到 $5.00 时结束会话。'],
+    ['STANDARD applies next session', '标准档将在下次会话生效'],
+    ['MINI applies next session', '迷你档将在下次会话生效'],
+
+    // 语音卡片：显示串（display.title / lines / notes / planStepLabel）
+    ['View state', '视图状态'],
+    ['Wind on', '风场 已开启'],
+    ['Street Level off', '街景 已关闭'],
+    ['Frame flights', '取景航班'],
+    ['Frame vessels', '取景船舶'],
+    ['7 aircraft in frame', '画面内有 7 个航班'],
+    ['12 ships in frame', '画面内有 12 个船舶'],
+    ['Within 200 km of the view', '视野范围内 200 公里'],
+    ['Altitude 35,000 feet', '高度 35,000 英尺'],
+    ['12 km from Paris', '距 Paris 12 公里'],
+    ['Camera range 5 km', '相机距离 5 公里'],
+    ['Marked 3 places', '已标注 3 个地点'],
+    ['Not found: Paris, Lyon', '未找到: Paris, Lyon'],
+    ['Source: OpenStreetMap', '来源: OpenStreetMap'],
+    ['Labels on', '标注已开启'],
+    ['Finding places: Paris', '正在查找地点: Paris'],
+    ['Tracing outline: Paris', '正在描绘轮廓: Paris'],
+    ['Nearest ships to Paris', '距 Paris 最近的船舶'],
+    // 卡片步骤状态（voiceCard.js 拼成 `, ${statusText}`）
+    [', done', '，已完成'],
+    [', failed', '，失败'],
+    // JS 内嵌 HTML 里的计数串
+    ['Named areas (3)', '具名区域（3）'],
+    ['+2 additional payload records', '另有 2 条载荷记录'],
+    ['FIELD REPORTS · 4', '实地报告 · 4'],
+    ['01 · Rasuwagadhi witness', '01 · Rasuwagadhi witness'],
+  ];
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) {
+      failures.push(`${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`);
+    }
+  }
+  assert.deepEqual(failures, [], `街景/语音动态串回归：\n  ${failures.join('\n  ')}`);
+
+  // 反向对照（防止用例因「词典整体失灵」而假绿）：
+  // 语音的 say 播报串是**刻意不译**的，必须保留原文。
+  // 若哪天有人把它们也加进词典，这条会报红提醒：那是给模型念的，不是给界面看的。
+  const spoken = [
+    "Couldn't frame the aircraft right now.",
+    'Finding Paris on the map.',
+    'Picking the nearest aircraft.',
+  ];
+  for (const text of spoken) {
+    assert.equal(lookup(text), null, `播报串被误译（say 不进 DOM，不该有词条）：${JSON.stringify(text)}`);
+  }
+  // MCP 工具表的 title/description 也不进浏览器（src/tools/* 只被 MCP protocol 消费）
+  assert.equal(lookup('Weather map'), null, 'MCP 工具 title 被误译（它不进浏览器 UI）');
 });
 

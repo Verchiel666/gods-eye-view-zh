@@ -2,6 +2,55 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.6.0 — 2026-10-09
+
+同步上游 22 个提交（33 文件，+2491/-38）后的一轮汉化补全，同时补上 2026-10-08 合并（`fd1288c`，街景图层）遗留的欠账。上游无冲突，汉化补丁文件独立。**本轮上游主要内容是 ChatGPT/Codex OAuth 语音认证（#621，实验性）与矢量瓦片原点跟随 TileJSON 配置（#933/#935）**。本轮真正的重头戏是发现并堵住了覆盖率门槛的**第二片结构性盲区**。
+
+### 新增
+
+- **街景图层面板**（2026-10-08 合并引入，`src/ui/templates/layer-panels.html` + `src/ui/streetLevelPresentation.js`）— 面板标题 `STREET LEVEL`、查看器工具条（`EXPAND`/`SHRINK`/`FIT`/`FILL`/`FOLLOW`）、筛选（`PROVIDERS`/`IMAGERY`/`ALL`/`FLAT`）、SINCE 滑块九个档位（`ANY DATE`/`LAST MONTH`…`LAST 10 YEARS`/自定义 `LAST N DAYS`）、状态芯片（`KEY REQUIRED`/`KEY REJECTED`/`loading coverage...`）、数据源 chip 动态 title（`Mapillary imagery on|off`、密钥缺失与错误透传形态）、覆盖统计（`N images in this sequence · Esc clears`、`N sequences in view · click a line for its photos`）、全部 title/aria-label 长文案、`Image by ${creator}` 署名。
+- **ChatGPT OAuth 语音认证**（本轮上游 #621，`src/keySetup.js` + `src/voice/cloudVoiceAuth.js` + `src/voice/realtimeCost.js`）— 认证方式切换控件（`VOICE AUTH · API KEY|CHATGPT OAUTH`、`USE API KEY`/`USE CHATGPT OAUTH` 及 title）、登录流程全部状态行（检查中/过期重登/浏览器等待/超时/完成等 12 条）、费用读数 `COST UNKNOWN` 与 OAuth 用量 title 复合串（响应数/令牌数/字幕转写数）、模型档位提示（`Next session: … — this session stays on …`、`Voice model: … — click to switch to standard; applies next session`、`STANDARD|MINI applies next session`）、`Save failed (nnn).` 与透传型 `OAuth check failed: ${message}`。
+- **OAuth 服务端错误消息 17 条**（`server/providers/openai/codex-auth.js`、`realtime.js`）— 这批消息经 HTTP 响应体 `payload.error` 透传进浏览器状态行（`say(payload.error || '…')`），必须自己有词条，否则复合规则 `trKeep` 译不出会让整条放弃、操作员看到完整英文长串（zh-1.5.0 的 `TomTom flow timed out` 同款模式）。含本机限制三条（`ChatGPT OAuth is available only from this machine` 等）、跨源拒绝、存储路径不匹配、Codex 未安装、登录超时/未完成、auth.json 无可用令牌等。
+- **语音助手卡片**（`src/voice/control.js` 用 **innerHTML 内嵌 HTML**，自 2026-09-15 语音核心引入起就是英文——见下文盲区）— 卡片骨架全部文案（`VOICE`/`YOU`/`GEV`/`THIS`/`HERE`/`NOTES & SOURCES`/`VOICE SYSTEM ERROR`/`DISMISS`、aria-label 五条）、步骤状态（`, done`/`, failed` 等带前导逗号的拼接形态）、步骤标签（`STEP_LABELS` 七条 + `progressStepLabel` 的 `${base}: ${label}` 复合形态）、计划步骤（`Mark ${place} +N`/`Fly to ${place}`/`Nearest ${noun} to ${place}`）、结果标题（`View state`/`Nothing marked`/`Marked N places`/`${count} ${noun} in frame`/`Frame ${target}`/`${label} on|off`）、明细行（`Within N km of the view`/`Altitude N feet`/`N km from ${place}`/`Camera range N km`/`Labels on`/`Source: ${label}`/`Not found: ${list}`）。
+- **HUD 启动占位串**（`src/hud.js` 同为 innerHTML 内嵌）— `Awaiting telemetry...`、`PAGE 1/1`、`AIS: --`、`BAND: PAN`、`BITS: 11`、`LVL: 1A`、`GSD: --m  NIIRS: --`、`ALT: --m   SUN: --° EL` 等真实遥测到达前的占位文本。
+- **尼泊尔洪水事件面板**（`src/data/bhoteKoshiEvent.js` 同为 innerHTML 内嵌）— `BHOTE KOSHI OUTBURST FLOOD` 标题、状态芯片（`OBSERVED IMAGERY`/`SCHEMATIC CORRIDOR`）、故事节拍导航、操作按钮六条（`▶ PLAY`/`◉ CINEMATIC`/`↺ FULL STORY` 等含符号前缀形态）、`FIELD REPORTS · N`、证据面包屑 `01 · ${title}`、云系说明与示意走廊 caveat。
+- **军事目标情报面板**（`src/layers/awareness/panel.js`，markup 存变量再赋 innerHTML + 文案藏 `${cond ? 'A' : 'B'}` 插值——双层盲区）— `CONTEXT READY`/`GLOBAL CONTEXT OFF` 开关文案、导航控件（`PREVIOUS` 及两条 250 km 窗口 title）、`Named areas (N)`、开源证据免责长句。
+- **太空任务面板控件提示**（`src/layers/launches/panel.js`）— `Show all missions`/`Previous mission`/`Next mission`/`Deselect mission`/`Replay speed multiplier` 等 title/aria-label，`+N additional payload records` 溢出计数。
+- **图层显示名 13 条**（`layer.name` 与 `layerPanel.js` 的 `PANEL_LABELS`）— `Live Vessels`/`Bike Share`/`Cameras`/`Street Level`/`Mapped ALPR Cameras`/`Data Centers`/`Active Fires`/`Fire Perimeters`/`Earthquakes (24h)`/`Directions`/`Satellites`/`Transit`/`Wind`。图层名同时是语音卡片 `${label} on|off` 规则的前件（trKeep 严格匹配），缺词条会连带整条复合串放弃。
+- **面板拖拽调宽提示**（`src/ui/panelPositionControls.js`）— `Drag to resize · double-click the header to snap back`。
+- 词典从 841 条扩充到 **1031 条**（+190），动态串规则 139 → **177 条**（+38）。
+
+### 修复（一处真 bug + 一片从未被扫到的盲区）
+
+- **尾随分隔符标签串整串漏译（真 bug，合并前就存在）** — 太空任务面板把字段写成 `STATUS · <b>值</b>`，标签文本节点是 `'STATUS · '`（带尾随空格）。`lookup()` 开头 `trim()` 把空格吃掉后 `' · '` 不再完整，`translateSegments` 的分隔符检测够不着，整串原样留在界面上——7 个字段标签全是这个形态，用户长期看到「STATUS · 正常」半英半中。修法：`lookup()` 单开尾随分隔符分支，只译标签部分，分隔符与尾随空白原样保留（那个空格是 `<b>` 前的排版间距）。已反向验证：禁用该分支 → 7 条全部退回原文 + 新门槛精确报红。
+- **覆盖率门槛的第二片结构性盲区：JS 内嵌 HTML 模板** — 静态门槛只扫 `src/ui/templates/*.html`，但上游有 5 个模块把整块面板标记写成 JS 里的 innerHTML 模板字符串（语音控件/HUD/太空任务/军事情报/洪水事件），共 **101 条可见文案**，门槛一条也扫不到。语音卡片自 2026-09-15 引入起就是英文，欠账潜伏 3 周多，期间门槛一直全绿。军事情报面板更是双层盲区：markup 存变量再赋值（匹配不到 `innerHTML = \`` 形态）+ 文案藏在 `${cond ? 'A' : 'B'}` 插值里（标签间文本正则刻意排除 `{}`）。本轮全部补齐并固化为新门槛（见下）。
+- **新增 `'ALL'` 等短词前按纪律做了撞车核查** — 电台调谐器复合串 `ALL · DRAG THE NEEDLE` 整串在词典（dictOnly 精确匹配优先，不会退化）；小写 `all`/`fit`/`fill`/`flat`/`done` 等经 grep 确认不作为独立可见文本出现（大小写兜底不会误伤）；Material Symbols 图标清单 32 个连字与本轮新增词零重合，JS 动态换图标处（`cockpitLayout.js` 的 chevron/right_panel 系列）也不在新增词内。防御性把这批常用词全部加进图标保护测试清单（22 个新词），DOM 容器拦截验证有效。
+
+### 门槛强化
+
+- 新增测试 **`JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区）`** — `collectInlineHtmlStrings()` 扫 `src/` 全部非测试 JS 中含 HTML 标签的反引号模板（不按赋值形态匹配，覆盖变量间接），提取 title/text/placeholder/aria-label 四类 + 插值三元字面量一层。内置**三道防假绿自检**：①提取条数下限 > 60；②5 个已知模块必须都被扫到（防「一个文件都扫不到 → missing 恒空 → 假绿」）；③三层盲区各留哨兵串（直接模板/变量间接/插值三元）做正向对照。三道自检都做过反向验证：删词条 → 精确报红指出文件与串；采集器退化成只认直接赋值 → 自检②报红；禁用三元层 → 哨兵断言精确报红。
+- 新增测试 **`尾随分隔符标签串（太空任务面板字段）必须译出`** — 7 条 `'LABEL · '` 形态 + 尾随空白保留断言 + 幂等（写入恰 1 次）+ 反向对照（不带尾随分隔符的复合串仍走 translateSegments 行为不变）。
+- 新增测试 **`街景 / OAuth 语音 / 语音卡片动态串必须译出`** — 44 条用例全部取自源码真实拼接形态。内置**刻意不译清单**做正向对照：语音 `say` 播报串（经 `realtimeProtocol.js:145` 编进模型 prompt，不进 DOM——译了反而破坏英文语境播报）与 MCP 工具 `title`（只被 `src/tools/mcp/protocol.js` 消费，UI 不导入）必须保持 `lookup` 返回 null，防止后人「顺手补全」造成过度翻译。
+- 汉化门槛测试从 21 例增至 **24 例**；静态模板覆盖 **413/413 = 100%**（门槛首跑报红 26 条，全是 10-08 `fd1288c` 合并带入的街景面板文案：7 条 title + 11 条文本 + 8 条 aria-label，已全补）；JS 内嵌 HTML 覆盖 **101/101 = 100%**。
+- 图标连字保护清单从 18 词扩到 **39 词**（新增 fit/fill/all/expand/follow/flat/since/shrink/voice/done/previous/plan/stage/cause/working/manage/notes/sources/dismiss/providers/imagery 共 21 个防御性用例），全部通过——本轮新增词虽暂无同名图标，但 `dictOnly` 大小写兜底会译小写形态，上游日后新增小写图标连字时这层拦截就是唯一防线。
+
+### 排错教训
+
+- **「门槛全绿」的盲区不止一片，而且第二片比第一片更深。** zh-1.5.0 已记录过「JS 现拼动态串」盲区（4f），本轮发现的是更底层的「JS 内嵌 HTML 模板」盲区——文案明明写在 HTML 标记里，只是标记本身在 JS 字符串里。判读方法：**grep `innerHTML` 比 grep 模板文件更根本**；采集器必须覆盖变量间接赋值与 `${cond ? 'A' : 'B'}` 插值两个形态，且要配「已知文件必须被扫到」的哨兵断言，否则采集器自身退化时门槛会以「零缺口」的姿态假绿。
+- **把扫描候选当缺口清单直接补，会制造重复键。** 本轮曾把 4 条既有词条（250 km window 两条 title、Cancel/Pause replay）又加了一遍——探针当时明明报「已译」，我却照着扫描器的原始输出补。重复键虽被门槛抓住，但暴露了流程错误：**扫描器输出是候选，必须先过探针筛一遍再动手**。
+- **修通用逻辑前先跑存量测试，别凭直觉写宽规则。** 第一版给裸 `N km`/`N feet` 写了规则，立即打爆「量词段不得波及单位数据」与「专有名词防过宽」两道存量门槛（`3.2 km` 是刻意保留的数据段）。正确姿势是把单位翻译写进带语境前缀的整串规则（`Within N km of the view`），存量门槛的断言就是设计意图文档，红了的瞬间先读测试注释再改规则。
+- **Windows 下 `path.relative` 返回反斜杠** — 新门槛的「已知文件必须被扫到」自检第一次跑就全红，原因是期望值写的 POSIX 路径与 `src\voice\control.js` 不匹配。采集器输出统一 `split(path.sep).join('/')`。跨平台测试的哨兵断言要注意路径形态。
+
+### 同步记录
+
+- 守门检查：远程 `6be2559` vs 本地缓存 `95fa816` → 上游有更新，fetch 后落后 **22** 个提交、领先 22。
+- 合并无冲突，merge 提交 `8d7fb93`（parents `fd1288c` + `6be2559`）。
+- 依赖检查：`package.json` / `package-lock.json` **均未变** → 无需 `npm install`；**本轮上游未动任何模板**（`git diff fd1288c 8d7fb93 -- src/ui/templates index.html` 为空）。静态条数 387 → 413 的 26 条增量全部来自 10-08 那次 `fd1288c` 合并（该轮合并后没有跟汉化提交），本轮一并补齐。用 `90f2a45`（zh-1.5.0）的模板跑同一采集器实测得 387，与门槛首跑的 26 条缺口清单双向印证。
+- 完整验证：`npm test` **6239 / 6228 pass / 1 fail / 10 skip**——唯一失败是本轮上游新增的 `src/codexOauthRealtime.test.mjs`（Windows 路径分隔符平台缺陷：期望 `/home/fixture/.local/bin/codex`，实际 `path.join` 在 win32 产出反斜杠路径）。**已用 stash 对照法确证与汉化无关**：暂存本 fork 全部改动后在纯 merge 状态跑同一文件，同样 7/8 通过 1 失败。属上游测试的平台兼容 bug，不在本 fork 修复范围。
+- `npm run build` ✓（15.5s）；`check:boundaries` ✓；汉化门槛 24/24 全绿。
+- 探针实测：内嵌 HTML 候选 103 条，以 HEAD 版 `zh.js` 实测的**修复前基线为命中 34 / 未命中 69**，修复后命中 **102 / 未命中 1**（唯一未译 `escapeHtml(name)).join('` 是箭头函数被文本正则误切的扫描伪影，非真实文案）。街景/语音/费用动态串 51 条候选实测修复后命中 48 / 未命中 3，三条未译均为**刻意保留**：`MAPILLARY ↗`（品牌名 + 外链箭头）、`360° · 128° · 2026-09-01`（纯数据段，translateSegments 按纪律保留）、`01 · Rasuwagadhi witness`（序号已译出，地名为专有名词）。
+- 四次反向验证全部干净（删词条/禁分支/退化采集器/禁三元层 → 对应断言精确报红；每次先 `node --check` 排除级联失败；还原 → 24/24）。
+
 ## zh-1.5.0 — 2026-09-29
 
 同步上游 2 个提交（201 文件，+26668/-1976）后的一轮汉化补全。上游无冲突，汉化补丁文件独立。**本轮上游是一次数据源架构重构——`fix(osm): stop using public Overpass by default`（#648 / #742）**：交通路网改走 OpenFreeMap 矢量瓦片（配 TomTom 密钥时为 Hybrid），军事区域改用 OpenFreeMap 多边形加自带全球名称索引，ALPR 改读 OSM 小时级抽取，驾驶舱地点上下文与国/州/县边界改用内置 Natural Earth 与 US Census 数据，Overpass 仅在运维自行配置端点时才使用；数据署名统一为一条 OpenStreetMap。另有 #821 提示既有安装更新。

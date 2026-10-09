@@ -828,7 +828,274 @@
     'Detailed outline unavailable': '详细轮廓不可用',
     'Location not found': '未找到该地点',
     'Search failed': '搜索失败',
-    'Fly to a POI first': '请先飞往一个兴趣点'
+    'Fly to a POI first': '请先飞往一个兴趣点',
+
+    // ===== 街景图层（street-level）面板 =====
+    // 2026-10-08 上游合并引入（src/ui/templates/layer-panels.html + streetLevelPresentation.js）。
+    // 静态部分被覆盖率门槛抓到，动态部分（SINCE 档位、chip title、覆盖统计）只能靠规则。
+    'STREET LEVEL': '街景',
+    'Street-level viewer': '街景查看器',
+    'Street-level image': '街景图像',
+    'EXPAND': '展开', 'SHRINK': '缩小',
+    'FIT': '完整', 'FILL': '铺满', 'FLAT': '平面',
+    // 'ALL' 是全景筛选的第一个档位（data-sl-pano="all"）。
+    // 与电台调谐器的复合串 'ALL · DRAG THE NEEDLE' 不冲突：
+    // dictOnly 精确匹配优先，整串先命中，不会退化成「全部 · DRAG THE NEEDLE」。
+    // 小写 'all' 已 grep 确认不作为可见文本单独出现（大小写兜底不会误伤）。
+    'ALL': '全部',
+    'FOLLOW': '跟随', 'PROVIDERS': '数据源', 'IMAGERY': '影像',
+    'SINCE': '起始时间', 'ANY DATE': '不限日期',
+    'Image fit': '图像适配方式',
+    'Imagery providers': '影像数据源',
+    'Imagery filters': '影像筛选条件',
+    'Panorama filter': '全景筛选',
+    'Coverage colours': '覆盖配色',
+    'Camera follows view': '相机跟随视角',
+    'Close the street-level image': '关闭街景图像',
+    'Turn Street Level on or off': '开启或关闭街景图层',
+    'Turn Street Level on': '开启街景图层',
+    'Turn Street Level off': '关闭街景图层',
+    'Expand the street-level view (Esc shrinks it)': '展开街景视图（按 Esc 缩小）',
+    'Fit: show the whole photo, with dark bars where its shape differs from the frame':
+      '完整：显示整张照片，与画框比例不一致处以黑边填充',
+    'Fill: fill the frame edge to edge, cropping the photo':
+      '铺满：照片铺满画框边缘，超出部分裁切',
+    'Camera follows view: move the globe camera wherever the street-level view looks':
+      '相机跟随视角：街景朝哪看，地球相机就跟到哪',
+    'Camera follow needs the Google 3D map: choose Google 3D under MAP SOURCE':
+      '相机跟随需要 Google 3D 地图：请在「地图源」中选择 Google 3D',
+    'Close the image and deselect it on the map': '关闭图像并在地图上取消选中',
+    "Open this image on the provider's site": '在数据源网站打开这张图像',
+    // 状态芯片（presentStatus）
+    'KEY REJECTED': '密钥被拒', 'KEY REQUIRED': '需要密钥',
+    'loading coverage...': '正在加载覆盖范围...',
+    // 覆盖统计（presentMeta）
+    'Switch a provider on to draw its coverage.': '开启任一数据源即可绘制其覆盖范围。',
+    'Loading this sequence…': '正在加载该序列…',
+    // SINCE 档位标签（SINCE_STOPS，label 直出到 output 元素）
+    'LAST 10 YEARS': '近 10 年', 'LAST 5 YEARS': '近 5 年', 'LAST 3 YEARS': '近 3 年',
+    'LAST 2 YEARS': '近 2 年', 'LAST YEAR': '近 1 年',
+    'LAST 6 MONTHS': '近 6 个月', 'LAST 3 MONTHS': '近 3 个月', 'LAST MONTH': '近 1 个月',
+    // Mapillary 数据源错误前缀（source.js 的 readJsonOrThrow 标签）
+    'Mapillary graph': 'Mapillary 图数据',
+    'Mapillary status': 'Mapillary 状态',
+    'Mapillary token not configured': 'Mapillary 令牌未配置',
+
+    // ===== ChatGPT OAuth 语音认证（2026-10-09 上游 #621 新增）=====
+    // src/keySetup.js 在密钥设置面板里插入认证方式切换控件；
+    // say() 把状态写进 statusLine.textContent，所以这些串是界面可见的，不是日志。
+    'VOICE AUTH · API KEY': '语音认证 · API 密钥',
+    'VOICE AUTH · CHATGPT OAUTH': '语音认证 · ChatGPT OAuth',
+    'USE API KEY': '改用 API 密钥',
+    'USE CHATGPT OAUTH': '改用 ChatGPT OAuth',
+    'Use OPENAI_API_KEY for the next cloud voice session':
+      '下次云端语音会话使用 OPENAI_API_KEY',
+    'Use the signed-in local ChatGPT/Codex OAuth session for the next cloud voice session':
+      '下次云端语音会话使用本机已登录的 ChatGPT/Codex OAuth 会话',
+    'MANAGE ↗': '管理 ↗',
+    'Saving…': '正在保存…',
+    'Paste at least one key first.': '请先粘贴至少一个密钥。',
+    'Cloud voice will use OPENAI_API_KEY on the next session.':
+      '云端语音将在下次会话使用 OPENAI_API_KEY。',
+    'Checking local ChatGPT OAuth sign-in…': '正在检查本机 ChatGPT OAuth 登录状态…',
+    'Could not check ChatGPT sign-in. Try again.': '无法检查 ChatGPT 登录状态，请重试。',
+    'Could not check ChatGPT sign-in.': '无法检查 ChatGPT 登录状态。',
+    'ChatGPT OAuth selected for cloud voice. Your API key stays saved and available.':
+      '已为云端语音选择 ChatGPT OAuth。你的 API 密钥仍已保存并可用。',
+    'ChatGPT sign-in expired. Opening sign-in again…': 'ChatGPT 登录已过期，正在重新打开登录…',
+    'Opening ChatGPT sign-in in your browser…': '正在浏览器中打开 ChatGPT 登录…',
+    'Could not start ChatGPT sign-in on this machine.': '无法在本机启动 ChatGPT 登录。',
+    'Finish ChatGPT sign-in in the browser. Waiting for it to complete…':
+      '请在浏览器中完成 ChatGPT 登录，正在等待完成…',
+    'ChatGPT sign-in timed out. Click USE CHATGPT OAUTH to try again.':
+      'ChatGPT 登录超时，点击「改用 ChatGPT OAuth」重试。',
+    'ChatGPT sign-in complete. OAuth will be used for the next cloud voice session.':
+      'ChatGPT 登录完成，下次云端语音会话将使用 OAuth。',
+    // 费用读数（realtimeCost.js）：OAuth 模式下无法计价
+    'COST UNKNOWN': '费用未知',
+    'Voice model tier — applies next session': '语音模型档位 — 下次会话生效',
+    'Estimated session cost': '会话费用估算',
+
+    // ===== 语音助手卡片（src/voice/control.js 用 innerHTML 内嵌 HTML）=====
+    // ⚠ 覆盖率门槛只扫 src/ui/templates/*.html，扫不到 JS 内嵌模板 ——
+    // 这批串自 2026-09-15 语音核心引入起一直是英文，属于门槛盲区造成的历史欠账。
+    'VOICE CONTROL': '语音控制',
+    'Voice assistant': '语音助手',
+    'Voice control — activate to toggle voice; hold Space to speak':
+      '语音控制 — 激活可开关语音；按住空格说话',
+    'Hold Space to speak · tap Space to activate focused controls':
+      '按住空格说话 · 轻点空格激活当前聚焦的控件',
+    'Dismiss voice card': '关闭语音卡片',
+    'Referenced items': '引用条目',
+    'Plan': '执行计划',
+    'NOTES & SOURCES': '备注与来源',
+    'VOICE SYSTEM ERROR': '语音系统错误',
+    'DISMISS': '关闭',
+    'Check microphone permission and network access, then try again.':
+      '请检查麦克风权限与网络连通性，然后重试。',
+    'YOU': '你', 'GEV': '上帝之眼', 'THIS': '此项', 'HERE': '此处',
+    // 卡片步骤状态（voiceCardPresentation.js 的 STATUS_TEXT，拼在标签后作 ", done"）
+    'in progress': '进行中', 'done': '已完成', 'failed': '失败', 'cancelled': '已取消',
+    'WORKING': '处理中', 'DONE': '已完成',
+    // 步骤标签（speech.js 的 STEP_LABELS，显示在计划列表里）
+    'Finding places': '正在查找地点',
+    'Tracing outline': '正在描绘轮廓',
+    'Tracing outlines': '正在描绘轮廓',
+    'Looking up place': '正在查询地点',
+    'Flying': '正在飞往',
+    'Turning on layer': '正在开启图层',
+    'Loading aircraft': '正在加载航班',
+    'Picking nearest': '正在选取最近的',
+    'Working': '处理中',
+    // 结果标题 / 计划步骤（display.title、planStepLabel —— 只补显示串，
+    // speech.js 里给模型念的 say 串是播报内容，不进 DOM，不补）
+    'View state': '视图状态',
+    'Nothing marked': '未能标注任何目标',
+    'Mark the map': '在地图上标注',
+    'Read the view': '读取当前视图',
+    'Check view state': '检查视图状态',
+    'Outline traced': '轮廓已描绘',
+    'Outline unavailable': '轮廓不可用',
+    'Framing uses the nearest 80 loaded contacts': '取景仅使用最近的 80 个已加载目标',
+
+    // ===== HUD 抬头显示的启动占位串（src/hud.js 用 innerHTML 内嵌）=====
+    // 同属门槛盲区：真实遥测到达前用户看到的就是这些占位文本。
+    'Awaiting telemetry...': '等待遥测数据...',
+    'PAGE 1/1': '第 1/1 页',
+    'AIS: --': '船舶 AIS: --',
+    'BAND: PAN': '波段: 全色',
+    'BITS: 11': '位深: 11',
+    'LVL: 1A': '级别: 1A',
+    'COLL: --:--:--Z': '采集: --:--:--Z',
+    'LAT: -- LON: -- MGRS: ---': '纬度: -- 经度: -- MGRS: ---',
+    // 注：'MGRS: ---' 不单独给词条。词典精确匹配优先于规则，加了它反而会挡住
+    // 既有的 `/^MGRS: (.+)$/` → 界面显示原文 `MGRS: ---` 而不是「MGRS 坐标: ---」。
+    // 让它走规则即可（占位符 --- 由捕获组原样保留）。
+    'GSD: --m  NIIRS: --': '地面采样: --米  影像等级: --',
+    'ALT: --m   SUN: --° EL': '高度: --米   太阳角: --° 仰角',
+    // 注：HUD 的 'REC' 已在上方驾驶舱段收录，此处不重复添加（重复键会让后者静默覆盖前者）。
+
+    // ===== 尼泊尔洪水事件图层（src/data/bhoteKoshiEvent.js 用 innerHTML 内嵌）=====
+    'BHOTE KOSHI OUTBURST FLOOD': '波特科西溃决洪水',
+    'Bhote Koshi flood reconstruction controls': '波特科西洪水过程重建控件',
+    'EVENT RECONSTRUCTION · 26 AUG 2026': '事件重建 · 2026 年 8 月 26 日',
+    'OBSERVED IMAGERY': '实测影像',
+    'SCHEMATIC CORRIDOR': '示意走廊',
+    '2021 HISTORICAL REFERENCE / 2026 POST-EVENT': '2021 年历史参照 / 2026 年灾后',
+    'Historical reference and post-event image split': '历史参照与灾后影像分屏位置',
+    'RECONSTRUCTION CLOCK': '重建时钟',
+    'NEPAL SCENE CLOCK': '尼泊尔场景时钟',
+    'Schematic downstream progression': '示意下游推进进度',
+    'Story beat navigation': '故事节拍导航',
+    'Previous story beat': '上一个故事节拍',
+    'Next story beat': '下一个故事节拍',
+    'CAUSE': '成因',
+    'CAPTURE TIME UNVERIFIED': '拍摄时间未经核实',
+    'Play the next shot and continue through this scene': '播放下一镜头并继续演完本场景',
+    '▶ PLAY': '▶ 播放',
+    '▶ PLAY SCENE': '▶ 播放场景',
+    '◉ CINEMATIC': '◉ 运镜模式',
+    '↺ FULL STORY': '↺ 完整故事',
+    '↗ OPEN ORIGINAL': '↗ 打开原始数据',
+    '↗ OPEN PUBLIC MAP': '↗ 打开公开地图',
+    '⌖ LOWER GORGE': '⌖ 下游峡谷',
+    'GEOLOCATIONS · GEO GEORGE SHADRACH': '地理定位 · GEO GEORGE SHADRACH',
+    'Clouds are preserved from the source imagery.': '云系保留自原始影像。',
+    'SCHEMATIC CORRIDOR, NOT MODELED ARRIVAL TIME.': '示意走廊，非建模推算的到达时间。',
+    'Close event layer': '关闭事件图层',
+
+    // ===== 面板拖拽调宽（src/ui/panelPositionControls.js）=====
+    'Drag to resize · double-click the header to snap back':
+      '拖动调整大小 · 双击标题栏恢复默认',
+
+    // ===== 军事目标情报面板（src/layers/awareness/panel.js）=====
+    // 该文件把 markup 存进变量再赋给 innerHTML，且开关文案藏在
+    // `${cond ? 'A' : 'B'}` 插值里 —— 双重盲区，覆盖率门槛扫不到。
+    'Global Context navigation': '全球情报导航',
+    'CONTEXT READY': '情报就绪',
+    'GLOBAL CONTEXT OFF': '全球情报 关',
+    'SELECT A FLIGHT, VESSEL, OR MAPPED INSTALLATION': '请选择一个航班、船舶或已标注设施',
+    'ENABLE TO LOAD OBSERVED / MAPPED PROXIMITY': '开启后可加载实测/已标注的周边目标',
+    'PREVIOUS': '上一个',
+    // 注：'Previous — prior visited contact in the 250 km window' 与
+    // 'Next — nearest unvisited contact in the 250 km window' 已在上方
+    // 「情报 / 目标面板」段落收录，此处不重复（重复键后者会静默覆盖前者）。
+    'Open-source mapped/observed context. Missing broadcasts, unloaded map areas, or unmapped sites are not evidence of absence.':
+      '开源的已标注/实测周边情报。缺少广播、地图区域未加载或设施未标注，都不能作为「不存在」的证据。',
+
+    // ===== 太空任务面板的控件提示（src/layers/launches/panel.js）=====
+    // 注：'Cancel replay' / 'Pause replay' / 'Resume replay' 已在上方回放控制段落收录。
+    'Show all missions': '显示全部任务',
+    'Previous mission': '上一个任务',
+    'Next mission': '下一个任务',
+    'Deselect mission': '取消选中任务',
+    'Replay speed multiplier': '回放速度倍数',
+
+    // 语音卡片头部的 kicker 短标签（src/voice/control.js）
+    'VOICE': '语音',
+
+    // ===== 图层显示名（layer.name 与 layerPanel.js 的 PANEL_LABELS）=====
+    // 两处都要补：图层面板显示 `PANEL_LABELS[id] || layer.name`，
+    // 而语音卡片的结果标题直接用 `layer.name`（speech.js 的 layerLabel）。
+    // 后者还决定 `${label} on|off` 规则能否译出——规则用 trKeep 严格匹配，
+    // 图层名缺词条会让整条复合串放弃，界面留下 "Wind on" 这种半英半中。
+    'Live Vessels': '实时船舶',
+    'Bike Share': '共享单车',
+    'Cameras': '摄像头',
+    'Street Level': '街景',
+    'Mapped ALPR Cameras': '已标注 ALPR 摄像头',
+    'ALPR Cameras': 'ALPR 摄像头',
+    'Data Centers': '数据中心',
+    'Active Fires': '活跃火点',
+    'FIRMS Active Fires': 'FIRMS 活跃火点',
+    'Fire Perimeters': '火灾边界',
+    // 下面三个**不在此处重复添加**（重复键会让后者静默覆盖前者，门槛测试也会报红）：
+    //   'Cyclone advisories' —— 气旋图层段已有精确键（同译文「气旋公报」）
+    //   'Draw'               —— 手绘标注段已有精确键（「手绘」）
+    //   'Recent Imagery'     —— 近期影像段有 'RECENT IMAGERY' / 'Recent imagery'，
+    //                           layer.name 的 'Recent Imagery'（大写 I）靠 dictOnly
+    //                           的大写兜底命中，译文一致。该兜底行为已由
+    //                           「小写状态词的 dictOnly 大小写兜底」测试锁定。
+    'Earthquakes (24h)': '地震（24 小时）',
+    'Directions': '路径规划',
+    'Satellites': '卫星',
+    'Transit': '公共交通',
+    'Wind': '风场',
+
+    // ===== OAuth 语音认证的服务端错误消息 =====
+    // server/providers/openai/codex-auth.js 与 realtime.js 抛出的这些消息，
+    // 经 fetch 响应体的 payload.error 透传进 keySetup.js 的 say()，
+    // 最终写进界面状态行 —— 属于「错误消息经透传进 UI」的固有形态：
+    // 若不给它们词条，`OAuth check failed: ${...}` 那条复合规则会因
+    // trKeep 译不出而整条放弃，操作员看到的是完整英文长串。
+    'ChatGPT sign-in is unavailable': 'ChatGPT 登录不可用',
+    'ChatGPT sign-in is unavailable because the server has stopped.':
+      '服务端已停止，ChatGPT 登录不可用。',
+    'ChatGPT sign-in has expired. Re-authenticate in Provider Settings or run codex login and try again.':
+      'ChatGPT 登录已过期。请在「数据源配置」中重新认证，或运行 codex login 后重试。',
+    'CODEX_AUTH_JSON does not match the Codex login storage path. Set CODEX_HOME to the matching directory or sign in to Codex separately.':
+      'CODEX_AUTH_JSON 与 Codex 登录存储路径不匹配。请把 CODEX_HOME 设为对应目录，或单独登录 Codex。',
+    'Could not start ChatGPT sign-in. Check that Codex is installed, or set CODEX_BIN to its executable.':
+      '无法启动 ChatGPT 登录。请确认已安装 Codex，或把 CODEX_BIN 设为其可执行文件。',
+    'Could not start ChatGPT sign-in': '无法启动 ChatGPT 登录',
+    'ChatGPT sign-in did not complete. Try again in Provider Settings, or run codex login separately.':
+      'ChatGPT 登录未完成。请在「数据源配置」中重试，或单独运行 codex login。',
+    'ChatGPT sign-in did not complete. Try again in Provider Settings.':
+      'ChatGPT 登录未完成。请在「数据源配置」中重试。',
+    'Codex sign-in finished, but its configured auth.json has no usable ChatGPT token. Check CODEX_HOME and Codex credential storage. GEV can read file storage only.':
+      'Codex 登录已完成，但其配置的 auth.json 中没有可用的 ChatGPT 令牌。请检查 CODEX_HOME 与 Codex 凭据存储。本应用只能读取文件存储。',
+    'ChatGPT OAuth is available only from this machine':
+      'ChatGPT OAuth 仅可在本机使用',
+    'ChatGPT OAuth sign-in is available only from this machine':
+      'ChatGPT OAuth 登录仅可在本机使用',
+    'ChatGPT OAuth voice is available only from this machine':
+      'ChatGPT OAuth 语音仅可在本机使用',
+    'Cross-origin ChatGPT OAuth sign-in is not allowed':
+      '不允许跨源发起 ChatGPT OAuth 登录',
+    'Unsupported cloud voice auth mode': '不支持的云端语音认证方式',
+    'GEV_PREFER_CODEX_OAUTH must be true or false. Refusing to choose a voice auth mode.':
+      'GEV_PREFER_CODEX_OAUTH 必须是 true 或 false。拒绝自行选择语音认证方式。',
+    'Invalid login process': '登录流程无效'
   };
 
   /* 中文前缀 + 译文拼接：译文以中文开头时不补空格（否则是「正在切换到 调频」）。
@@ -837,6 +1104,17 @@
     var r = tr(rest);
     return prefix + (/[一-鿿]/.test(r.charAt(0)) ? '' : ' ') + r;
   }
+
+  /* 语音卡片里的目标类别名词（src/voice/speech.js 的 LAYER_NOUNS，取值域封闭）。
+     中文量词习惯是「个/架/艘」，这里按类别给不同量词，避免出现「7 架船舶」。
+     同样定义在 RULES 之前，规则函数才能引用。 */
+  var VOICE_NOUNS = {
+    'aircraft': '航班',
+    'military aircraft': '军用航班',
+    'ships': '船舶',
+    'satellites': '卫星',
+    'contacts': '目标'
+  };
 
   /* ---------- 动态串规则（正则 → 译文函数），更具体的放前面 ---------- */
   var RULES = [
@@ -1114,7 +1392,132 @@
     [/^OpenFreeMap tiles unavailable \(HTTP (\d+)\)$/, function (m) { return 'OpenFreeMap 瓦片不可用（HTTP ' + m[1] + '）'; }],
     [/^TomTom flow error \(HTTP (\d+)\)$/, function (m) { return 'TomTom 路况错误（HTTP ' + m[1] + '）'; }],
     [/^Camera tile feature limit exceeded$/, function () { return '摄像头瓦片要素数超出上限'; }],
-    [/^Vector tile feature limit exceeded$/, function () { return '矢量瓦片要素数超出上限'; }]
+    [/^Vector tile feature limit exceeded$/, function () { return '矢量瓦片要素数超出上限'; }],
+
+    // ===== 街景图层动态串（src/ui/streetLevelPresentation.js，2026-10-08 上游引入）=====
+    // 数据源 chip 的 title：`${provider.name} imagery on|off`
+    // provider.name 是专有名词（'Mapillary'），保留原文。
+    [/^(.+) imagery (on|off)$/, function (m) {
+      return m[1] + ' 影像' + (m[2] === 'on' ? '已开启' : '已关闭');
+    }],
+    // chip 的错误/密钥提示：`${provider.name}: ${原因}`
+    // 原因是内部串（keySetupRequirement 或 provider.error），捕获组过 tr 让已收录的能译出。
+    [/^(Mapillary): (.+)$/, function (m) { return m[1] + ': ' + tr(m[2]); }],
+    // keySetupCore.mjs 的密钥缺失提示：`Needs ENV_VAR — add it in Provider Settings`
+    [/^Needs (.+?) — add it in Provider Settings$/, function (m) {
+      return '需要 ' + m[1] + ' — 请在「数据源配置」中添加';
+    }],
+    // 覆盖统计（presentMeta）。数字经 toLocaleString 带千分位逗号，捕获组要允许逗号。
+    [/^([\d,]+) images in this sequence$/, function (m) { return '本序列有 ' + m[1] + ' 张图像'; }],
+    [/^([\d,]+) sequences in view$/, function (m) { return '视野内有 ' + m[1] + ' 条序列'; }],
+    // 图像署名：`Image by ${creator}`（作者名保留原文）
+    [/^Image by (.+)$/, function (m) { return '图像来源 ' + m[1]; }],
+    // SINCE 读数：`LAST 45 DAYS`（自定义天数档位，SINCE_STOPS 之外的分支）
+    [/^LAST ([\d,]+) DAYS$/, function (m) { return '近 ' + m[1] + ' 天'; }],
+    // 街景图像右上角读数由 ' · ' 拼接（`360° · 128° · 2026-09-01`），
+    // 全是数据段，translateSegments 会保留原文，无需规则。
+
+    // ===== 语音助手卡片动态串（src/voice/speech.js、voiceCardPresentation.js）=====
+    // 只覆盖**显示串**（display.title / lines / notes / planStepLabel / progressStepLabel）。
+    // speech.js 里给模型念的 `say` 串不进 DOM，刻意不译——译了反而让语音播报变中文，
+    // 而上游的语音模型指令与提示词全是英文语境。
+    // 图层开关标题：`${label} on|off`。label 是图层名，trKeep 严格译，
+    // 译不出就整条放弃（避免出现「Traffic 开」这种半中半英）。
+    [/^(.+) (on|off)$/, function (m) {
+      var name = trKeep(m[1]);
+      return name ? name + (m[2] === 'on' ? ' 已开启' : ' 已关闭') : null;
+    }],
+    // 取景结果标题：`${count} ${noun} in frame`。
+    // noun 取值域封闭（speech.js 的 LAYER_NOUNS，兜底 'contacts' / 'aircraft'）。
+    [/^([\d,]+) (aircraft|military aircraft|ships|satellites|contacts) in frame$/,
+      function (m) { return '画面内有 ' + m[1] + ' 个' + VOICE_NOUNS[m[2]]; }],
+    // `Frame ${target}` 的取值域**与上面不同**：来自 actionSchemas.js 里
+    // frame_overhead 的 target 枚举 ['flights','military','satellites','vessels']，
+    // 兜底字面量是 'flights'。写成 LAYER_NOUNS 会永远匹配不上（域不同）。
+    [/^Frame (flights|military|satellites|vessels)$/, function (m) {
+      var FRAME_NOUNS = {
+        flights: '航班', military: '军用航班', satellites: '卫星', vessels: '船舶'
+      };
+      return '取景' + FRAME_NOUNS[m[1]];
+    }],
+    [/^Nearest (aircraft|military aircraft|ships|satellites|contacts)$/,
+      function (m) { return '最近的' + VOICE_NOUNS[m[1]]; }],
+    [/^Nearest (aircraft|military aircraft|ships|satellites|contacts) to (.+)$/,
+      function (m) { return '距 ' + m[2] + ' 最近的' + VOICE_NOUNS[m[1]]; }],
+    // 明细行：`Within 200 km of the view` / `Altitude 35,000 feet` / `12 km from Paris`
+    // ⚠ 单位翻译必须写在**带语境前缀的整串规则**里，不能给裸 `N km` / `N feet` 写规则。
+    // 裸单位串是复合串里的「数据段」，translateSegments 刻意保留原文
+    // （`SATELLITE SPEED · 7.6 km/s` 之类，7.6 km/s 可能是产品名的一部分），
+    // 「量词段翻译不得波及单位数据」与「专有名词不得被误译」两道测试守着这条边界。
+    [/^Within ([\d.,]+) km of the view$/, function (m) { return '视野范围内 ' + m[1] + ' 公里'; }],
+    [/^Altitude ([\d,]+) feet$/, function (m) { return '高度 ' + m[1] + ' 英尺'; }],
+    [/^([\d.,]+) km from (.+)$/, function (m) { return '距 ' + m[2] + ' ' + m[1] + ' 公里'; }],
+    [/^Camera range ([\d.,]+) km$/, function (m) { return '相机距离 ' + m[1] + ' 公里'; }],
+    // 标注结果标题：`Marked 3 places` / `Marked 1 place`
+    [/^Marked ([\d,]+) places?$/, function (m) { return '已标注 ' + m[1] + ' 个地点'; }],
+    [/^Not found: (.+)$/, function (m) { return '未找到: ' + m[1]; }],
+    [/^Source: (.+)$/, function (m) { return '来源: ' + m[1]; }],
+    [/^Labels on$/, function () { return '标注已开启'; }],
+    // 计划步骤：`Mark Paris +2` / `Fly to Paris`（地名保留原文）
+    [/^Mark (.+?)( \+\d+)?$/, function (m) { return '标注 ' + m[1] + (m[2] || ''); }],
+    [/^Fly to (.+)$/, function (m) { return '飞往 ' + m[1]; }],
+    // 进度步骤：`Finding places: Paris`（progressStepLabel 的 `${base}: ${label}`）
+    [/^(Finding places|Tracing outline|Looking up place|Flying|Turning on layer|Loading aircraft|Picking nearest): (.+)$/,
+      function (m) { return tr(m[1]) + ': ' + m[2]; }],
+    // 卡片状态后缀：voiceCard.js 把它拼成 `, ${statusText}`，
+    // 因此文本节点里是 `, done` 这种带前导逗号的形态。
+    // ⚠ lookup() 会 trim，所以键不能写前导空格；逗号要包含在捕获里。
+    [/^, (in progress|done|failed|cancelled)$/, function (m) { return '，' + tr(m[1]); }],
+    // feed 状态芯片（feedChips）：小写状态值经 dictOnly 大小写兜底命中大写词条，
+    // 'nominal' 是默认状态、上游不出芯片，但 View state 明细行会直接显示它，故补。
+    [/^nominal$/, function () { return '正常'; }],
+
+    // ===== 语音会话费用读数（src/voice/realtimeCost.js）=====
+    // 模型 ID、美元金额、令牌数全是数据，只译框架文字。
+    [/^Next session: (\S+) — this session stays on (\S+)$/,
+      function (m) { return '下次会话: ' + m[1] + ' — 本次会话仍使用 ' + m[2]; }],
+    [/^Voice model: (\S+) — click to switch to (standard|mini); applies next session$/,
+      function (m) {
+        return '语音模型: ' + m[1] + ' — 点击切换到' + (m[2] === 'mini' ? '迷你' : '标准') + '档；下次会话生效';
+      }],
+    [/^Estimated session cost on (\S+) — ([\d,]+) response\(s\)\. Warns at (\$[\d.,]+), ends the session at (\$[\d.,]+)\.$/,
+      function (m) {
+        return m[1] + ' 上的会话费用估算 — 已产生 ' + m[2] + ' 次响应。达到 ' + m[3]
+          + ' 时告警，达到 ' + m[4] + ' 时结束会话。';
+      }],
+    [/^ChatGPT OAuth session: ([\d,]+) response\(s\), ([\d,]+) input and ([\d,]+) output tokens, ([\d,]+) caption transcription\(s\) reported\. USD cost and the API spend cap are unavailable for this auth mode\./,
+      function (m) {
+        return 'ChatGPT OAuth 会话：已报告 ' + m[1] + ' 次响应、' + m[2] + ' 输入与 ' + m[3]
+          + ' 输出令牌、' + m[4] + ' 次字幕转写。该认证方式下无法获得美元费用与 API 消费上限。';
+      }],
+    [/^Usage is incomplete because a response was still in flight when the session ended\./,
+      function () { return '会话结束时仍有响应未完成，因此用量数据不完整。'; }],
+    [/^(STANDARD|MINI) applies next session$/, function (m) {
+      return (m[1] === 'MINI' ? '迷你' : '标准') + '档将在下次会话生效';
+    }],
+
+    // ===== 密钥设置面板反馈（src/keySetup.js 的 say → statusLine.textContent）=====
+    [/^Save failed \((\d+)\)\.$/, function (m) { return '保存失败（HTTP ' + m[1] + '）。'; }],
+    // 透传型：`${error?.message || error}`，后半段可能已是中文或任意英文，
+    // 用 trKeep 严格译、译不出就整条放弃（避免半中半英长串）。
+    [/^Save failed: (.+)$/, function (m) {
+      var rest = trKeep(m[1]);
+      return rest ? '保存失败: ' + rest : null;
+    }],
+    [/^OAuth check failed: (.+)$/, function (m) {
+      var rest = trKeep(m[1]);
+      return rest ? 'OAuth 检查失败: ' + rest : null;
+    }],
+
+    // ===== 尼泊尔洪水事件图层（src/data/bhoteKoshiEvent.js）=====
+    [/^FIELD REPORTS · ([\d,]+)$/, function (m) { return '实地报告 · ' + m[1]; }],
+    // 证据面包屑标题：`01 · Rasuwagadhi witness`（地点名保留原文）
+    [/^(\d{2}) · (.+)$/, function (m) { return m[1] + ' · ' + tr(m[2]); }],
+
+    // ===== JS 内嵌 HTML 里的计数串（覆盖率门槛扫不到，只能靠规则）=====
+    // awareness/panel.js 的具名区域折叠标题、launches/panel.js 的载荷溢出提示。
+    [/^Named areas \((\d+)\)$/, function (m) { return '具名区域（' + m[1] + '）'; }],
+    [/^\+(\d+) additional payload records$/, function (m) { return '另有 ' + m[1] + ' 条载荷记录'; }]
   ];
 
   /* 词典直查（不含分段/规则），供 RULES 内部复用 */
@@ -1263,12 +1666,25 @@
       var byLine = translateLines(s);
       if (byLine !== null) return byLine;
     }
-    var t = s.replace(/\s+/g, ' ').trim();
+    var flat = s.replace(/\s+/g, ' ');
+    var t = flat.trim();
     if (!t || t.length < 2) return null;
     if (/[一-鿿]/.test(t)) {
       // 已含中文 → 防回环：默认整串跳过。
       // 唯一例外是 mixed 规则（上游把已汉化的面板标题拼进 title 的场景）。
       return runRules(t, true);
+    }
+    // 尾随分隔符：太空任务面板把字段写成 `STATUS · <b>值</b>`，标签文本节点
+    // 因此是 'STATUS · '。trim 吃掉尾随空格后 ' · ' 不再完整，
+    // translateSegments 的分隔符检测够不着 → 整串原样留在界面上
+    // （launches/panel.js 的 7 个字段标签全是这个形态）。
+    // 只译标签部分，分隔符与尾随空白原样保留（那个空格是 <b> 前的排版间距）。
+    // slice 后不含尾随 ' ·'，不会递归回本分支。
+    var tailSep = flat.match(/^(.*?) ·(\s*)$/);
+    if (tailSep) {
+      var headText = tailSep[1].trim();
+      var head = headText ? lookup(headText) : null;
+      return head === null ? null : head + ' ·' + tailSep[2];
     }
     var d = dictOnly(t);                          // 词典直查（内部已做字母校验）
     if (d) return d;
