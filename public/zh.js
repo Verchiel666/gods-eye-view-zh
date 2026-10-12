@@ -1097,6 +1097,75 @@
     // `${name}` 是 SourceUnavailableError.message，会经 recentImagery 的
     // `${label} catalog unavailable · ${error.message}` 透传，故保留可独立查到的形态。
 
+    // ===== 路径规划图层（清欠：上游 d78696d / 2026-09-14 #564 引入起就是英文）=====
+    // 载体是第三片盲区：directionsRowControls() 等纯函数造对象字面量，
+    // chipGroup.js / rowList.js 逐节点 set(textContent/title) 赋值——
+    // 既无 HTML 模板也无反引号标记，静态门槛与内嵌 HTML 门槛都扫不到。
+    // 三道核查已过：候选词不在 material-symbols 图标连字清单（28 个，含 JS 动态换的）；
+    // 小写 drive/walk/bike/fly/map/swap/set 均不作可见文本出现；
+    // SWAP/MAP 已有词条属近期影像/地图源语境，DRIVE/WALK/BIKE/FLY/SET A/SET B/CLICK MAP 仅此层使用。
+
+    // —— 模式芯片（DIRECTIONS_MODES.chip）——
+    'DRIVE': '驾车', 'WALK': '步行', 'BIKE': '骑行',
+    // —— 端点芯片（set-a/set-b，label 三态）——
+    'SET A': '设 A', 'SET B': '设 B', 'CLICK MAP': '点击地图',
+    // A ✓ / B ✓（已放置确认态）无需词条：lookup 返回 null → 原样保留，
+    // ✓ 是符号、A/B 是端点代号，本来就不该动（实测确认）
+    // —— 飞行芯片（fly，label 三态）——
+    'FLY': '飞行', 'FLYING': '飞行中', 'FLY ···': '飞行 ···',
+    // CLEAR 已在 CONTEXT_WORDS 容器消歧（按钮=清除），此处不动词典
+
+    // —— 芯片 title（悬停提示）——
+    'Swap A and B': '交换 A 和 B',
+    'Fly the camera along the route': '让相机沿路线飞行',
+    'Place A and B first': '请先放置 A 和 B',
+    'Remove the route and both markers': '清除路线与两个标记',
+    'Then click the globe to place the start': '然后点击地球放置起点',
+    'Then click the globe to place the destination': '然后点击地球放置终点',
+    'Click a spot on the globe to place A (click again to cancel)':
+      '点击地球上的位置放置 A（再次点击取消）',
+    'Click a spot on the globe to place B (click again to cancel)':
+      '点击地球上的位置放置 B（再次点击取消）',
+
+    // —— 明细行 / 状态串（directionsStats 与 runRoute 的 error）——
+    'Routing…': '正在规划路线…',
+    'Routing timed out': '路线规划超时',
+    'Routing unavailable': '路线服务不可用',
+    'Routing unavailable — no response from the routing service': '路线服务不可用 — 未收到路由服务响应',
+    'Routing is rate limited — try again in a moment': '路线请求过于频繁 — 请稍后再试',
+    // 片段形态：429 复合串 `X — try again in a moment` 的规则捕获组会拿到它，
+    // 且复合明细行 `UNAVAILABLE · OSM routing · <429串>` 也会经 em-dash 规则把
+    // 前半拆成这个片段（translateSegments 之前被规则接住），必须有独立词条
+    'Routing is rate limited': '路线请求过于频繁',
+    'No route found between A and B': 'A 与 B 之间没有可用路线',
+    'No route found': '未找到路线',
+    'Another map tool is using clicks — close it, then SET A again':
+      '其他地图工具正在占用点击 — 请先关闭它，再重新设 A',
+    'OSM routing': 'OSM 路径规划',
+    // 服务端 /api/route 代理的错误（经 payload.error 透传，429 时拼成
+    // `<error> — try again in a moment`；runRoute 的 else 分支拼成 `Routing failed: <error>`）
+    'no route found': '未找到路线',
+    'invalid profile': '无效的出行方式',
+    'invalid coordinate': '无效的坐标',
+    'need 2-12 coordinates': '需要 2–12 个坐标点',
+    'route leg too long': '单段路线过长',
+    'route too long': '路线总长过长',
+    'route proxy error': '路线代理出错',
+    'rate limited': '请求过于频繁',
+    'routing service is rate limited': '路由服务已限流',
+    'routing busy — too many routes at once': '路由繁忙 — 同时请求的路线过多',
+
+    // —— 步骤列表（directionsStepList 的 ariaLabel 与截断提示）——
+    'Turn-by-turn directions': '逐向导航',
+
+    // —— pointerBlockedMessage 的 toast（setArmed 被拒时）——
+    // `${name} is active — ${leave}, then set ${endpoint}` 整串规则在 RULES 段
+
+    // —— pointerBlockedMessage 的 toast 组件（setArmed 被拒时 showToast）——
+    // 整串 `<name> is active — <leave>, then set <A|B>` 规则在 RULES 段；
+    // draw 的 leave 文案单独建键（未知 owner 走 `turn <id> off` 规则兜底）
+    'press Escape twice to leave Draw': '按两次 Esc 离开手绘',
+
     // ===== OAuth 语音认证的服务端错误消息 =====
     // server/providers/openai/codex-auth.js 与 realtime.js 抛出的这些消息，
     // 经 fetch 响应体的 payload.error 透传进 keySetup.js 的 say()，
@@ -1573,7 +1642,120 @@
     // ===== JS 内嵌 HTML 里的计数串（覆盖率门槛扫不到，只能靠规则）=====
     // awareness/panel.js 的具名区域折叠标题、launches/panel.js 的载荷溢出提示。
     [/^Named areas \((\d+)\)$/, function (m) { return '具名区域（' + m[1] + '）'; }],
-    [/^\+(\d+) additional payload records$/, function (m) { return '另有 ' + m[1] + ' 条载荷记录'; }]
+    [/^\+(\d+) additional payload records$/, function (m) { return '另有 ' + m[1] + ' 条载荷记录'; }],
+
+    // ===== 路径规划图层动态串（清欠，上游 d78696d / 2026-09-14 #564）=====
+    // 载体同上（对象字面量 + 逐节点赋值），且全是运行时拼接，词典永远配不全键。
+
+    // 步骤指令骨架（src/data/routeSteps.js 的 instructionFor，实测 38 种形态归并为
+    // 「动词短语」+「onto <道路名>」两段；道路名是开放域专有名词，过 tr() 保留原文）
+    [/^Head out( on .+)?$/, function (m) { return '出发' + (m[1] ? '，沿 ' + tr(m[1].slice(4)) : ''); }],
+    [/^Arrive at your destination(, on the (left|right))?$/, function (m) {
+      return '到达目的地' + (m[2] ? '，在' + (m[2] === 'left' ? '左' : '右') + '侧' : '');
+    }],
+    [/^Turn( (slightly |sharply )?(left|right))?( onto .+)?$/, function (m) {
+      var head = m[1] ? '向' + (m[2] === 'slightly ' ? '稍' : m[2] === 'sharply ' ? '急' : '')
+        + (m[3] === 'left' ? '左' : '右') + '转' : '转弯';
+      return m[4] ? head + '，进入 ' + tr(m[4].slice(5)) : head;
+    }],
+    [/^Make a U-turn( onto .+)?$/, function (m) {
+      return '掉头' + (m[1] ? '，进入 ' + tr(m[1].slice(5)) : '');
+    }],
+    [/^Continue( straight| (left|right|slightly left|slightly right|sharply left|sharply right))?( onto .+)?$/,
+      function (m) {
+        var head = '继续' + (m[1] === ' straight' ? '直行' : m[1] ? '向'
+          + (m[2].indexOf('slightly') === 0 ? '稍' : m[2].indexOf('sharply') === 0 ? '急' : '')
+          + (m[2].endsWith('left') ? '左' : '右') + '行' : '');
+        return m[3] ? head + '，进入 ' + tr(m[3].slice(5)) : head;
+      }],
+    [/^At the end of the road, (turn (left|right)|continue)$/, function (m) {
+      return m[1] === 'continue' ? '到路尽头后继续直行' : '到路尽头后向' + (m[2] === 'left' ? '左' : '右') + '转';
+    }],
+    [/^Keep (left|right) at the fork$/, function (m) { return '在岔路口靠' + (m[1] === 'left' ? '左' : '右') + '行驶'; }],
+    [/^Continue at the fork$/, function () { return '在岔路口继续直行'; }],
+    [/^Merge( (left|right))?( onto .+)?$/, function (m) {
+      var head = '汇入' + (m[2] ? (m[2] === 'left' ? '左侧' : '右侧') : '');
+      return m[3] ? head + '车道，进入 ' + tr(m[3].slice(5)) : head || '汇入';
+    }],
+    [/^Take the ramp( on the (left|right))?( onto .+)?$/, function (m) {
+      var head = '上匝道' + (m[2] ? '（靠' + (m[2] === 'left' ? '左' : '右') + '）' : '');
+      return m[3] ? head + '，进入 ' + tr(m[3].slice(5)) : head;
+    }],
+    [/^Take the exit( on the (left|right))?( onto .+)?$/, function (m) {
+      var head = '驶出出口' + (m[2] ? '（靠' + (m[2] === 'left' ? '左' : '右') + '）' : '');
+      return m[3] ? head + '，进入 ' + tr(m[3].slice(5)) : head;
+    }],
+    [/^At the roundabout, take the (\d+)(st|nd|rd|th) exit( onto .+)?$/, function (m) {
+      var head = '在环岛走第 ' + m[1] + ' 个出口';
+      return m[4] ? head + '，进入 ' + tr(m[4].slice(5)) : head;
+    }],
+    [/^Enter the roundabout( onto .+)?$/, function (m) {
+      return '进入环岛' + (m[1] ? '，进入 ' + tr(m[1].slice(5)) : '');
+    }],
+    [/^At the roundabout, (turn (left|right)|continue)$/, function (m) {
+      return m[1] === 'continue' ? '在环岛继续直行' : '在环岛向' + (m[2] === 'left' ? '左' : '右') + '转';
+    }],
+    [/^Exit the roundabout( onto .+)?$/, function (m) {
+      return '驶出环岛' + (m[1] ? '，进入 ' + tr(m[1].slice(5)) : '');
+    }],
+    [/^Use the (left|right) lane$/, function (m) { return '走' + (m[1] === 'left' ? '左' : '右') + '侧车道'; }],
+
+    // 步骤列表与卡片（directionsStepList / directionsStepCopy；lead 是 `300 m` 类数据段，分段翻译保留）
+    [/^Only the first (\d+) turns of this route are shown$/, function (m) {
+      return '仅显示本路线的前 ' + m[1] + ' 个转弯';
+    }],
+    [/^Step (\d+) of (\d+)$/, function (m) { return '第 ' + m[1] + ' 步，共 ' + m[2] + ' 步'; }],
+    [/^Then: (.+)$/, function (m) { var v = trKeep(m[1]); return v ? '然后：' + v : null; }],
+
+    // 卡片明细行 `Step N of M · then 300 m · 2 min`（` · ` 复合串走 translateSegments，
+    // 段内 `300 m`/`2 min` 是刻意保留的数据段，只有 `then` 需要规则化——但它单独出现时
+    // 也是 `then 300 m · 2 min` 的首段，整段规则更稳）
+    [/^then ([\d.,]+ \w+)( · [\d.,]+ \w+)?$/, function (m) {
+      return '随后 ' + m[1] + (m[2] || '');
+    }],
+
+    // 路线摘要尾段（directionsStats 的 `${word}` 与 `first ${N} turns`，
+    // 走 ` · ` 分段后由这里接住；word 域已 grep：Drive/Walk/Bike 三种）
+    [/^Drive$/, function () { return '驾车'; }],
+    [/^Walk$/, function () { return '步行'; }],
+    [/^Bike$/, function () { return '骑行'; }],
+    [/^first (\d+) turns$/, function (m) { return '前 ' + m[1] + ' 个转弯'; }],
+
+    // 芯片 title：`${word} — reroute for ${word}`（em dash 复合，分段翻译切不开）
+    [/^(Drive|Walk|Bike) — reroute for (drive|walk|bike)$/, function (m) {
+      var w = { Drive: '驾车', Walk: '步行', Bike: '骑行' }[m[1]];
+      return w + ' — 按' + w + '方式重新规划';
+    }],
+
+    // 429 透传复合（directions/source.js：`${payload.error} — try again in a moment`；
+    // payload.error 为空时的独立 fallback 已在词典：'Routing is rate limited — try again in a moment'）
+    [/^(.+) — try again in a moment$/, function (m) {
+      var head = trKeep(m[1]);
+      return head ? head + ' — 请稍后再试' : null;
+    }],
+    // source.js 的 HTTP 形态（runRoute 经 error?.message 透传进 _error → stats.error → 明细行）
+    [/^Routing unavailable \(HTTP (\d+)\)$/, function (m) { return '路线服务不可用（HTTP ' + m[1] + '）'; }],
+    // runRoute 的 `Routing failed: ${payload.error}`（payload.error 域 = 服务端 fail() 消息，已在词典）
+    [/^Routing failed: (.+)$/, function (m) {
+      var rest = trKeep(m[1]);
+      return rest ? '路线规划失败：' + rest : null;
+    }],
+
+    // directionsStats 的 coverage 引导串（idle 态整段出现，也作为 ` · ` 复合串的一段）
+    [/^SET A, then click the globe$/, function () { return '先设 A，再点击地球'; }],
+    [/^SET B, then click the globe$/, function () { return '先设 B，再点击地球'; }],
+    [/^Click the globe to place ([AB])$/, function (m) { return '点击地球放置 ' + m[1]; }],
+
+    // pointerBlockedMessage 的 toast（setArmed 被拒时 showToast）：
+    // `<name> is active — <leave>, then set <A|B>`；已知 owner 只有 draw，
+    // 未知 owner 走 `turn <id> off` 兜底。name 用 tr()（id 兜底保留原文），leave 过 trKeep。
+    // draw 的 leave 文案在词典段（'press Escape twice to leave Draw'）。
+    [/^(.+) is active — (.+), then set ([AB])$/, function (m) {
+      var name = tr(m[1]);
+      var leave = trKeep(m[2]);
+      return name && leave ? name + '正在使用 — ' + leave + '，然后设置 ' + m[3] : null;
+    }],
+    [/^turn (.+) off$/, function (m) { return '关闭 ' + tr(m[1]); }]
   ];
 
   /* 词典直查（不含分段/规则），供 RULES 内部复用 */

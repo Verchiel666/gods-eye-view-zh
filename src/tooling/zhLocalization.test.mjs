@@ -1350,7 +1350,7 @@ test('数据源可用性 / PARTIAL 徽标：#982–#986 新增的 reason 链路�
     ['UNAVAILABLE · Street Level · No street-level imagery providers configured',
       '不可用 · 街景 · 未配置任何街景影像数据源'],
     ['UNAVAILABLE · OSM routing · Directions: data source not configured',
-      '不可用 · OSM routing · 路径规划：数据源未配置'],
+      '不可用 · OSM 路径规划 · 路径规划：数据源未配置'],
     ['UNAVAILABLE · Recent Imagery · Recent Imagery: data source not configured',
       '不可用 · 近期影像 · 近期影像：数据源未配置'],
   ];
@@ -1387,5 +1387,140 @@ test('数据源可用性 / PARTIAL 徽标：#982–#986 新增的 reason 链路�
   for (const text of devOnly) {
     assert.equal(lookup(text), null, `构建期守卫消息被误译（UI 不渲染，不该有词条）：${JSON.stringify(text)}`);
   }
+});
+
+test('路径规划图层：chips / 步骤指令 / 状态串必须译出（第三片盲区清欠）', () => {
+  const { lookup } = loadPatch();
+
+  // 2026-10-12 清欠：directionsRowControls() 等纯函数造对象字面量，
+  // chipGroup.js / rowList.js 逐节点 set(textContent/title) 赋值——
+  // 既无 HTML 模板也无反引号标记，静态门槛与内嵌 HTML 门槛都扫不到。
+  // 全部欠账自上游 d78696d（2026-09-14 #564）引入起潜伏。
+  // 用例形态全部从源模块实测取得（instructionFor 38 种骨架 / chips 三态 / stats 复合）。
+  const cases = [
+    // 模式芯片（DIRECTIONS_MODES.chip）与端点芯片三态
+    ['DRIVE', '驾车'],
+    ['WALK', '步行'],
+    ['BIKE', '骑行'],
+    ['SET A', '设 A'],
+    ['SET B', '设 B'],
+    ['CLICK MAP', '点击地图'],
+    ['FLY', '飞行'],
+    ['FLYING', '飞行中'],
+    ['FLY ···', '飞行 ···'],
+
+    // 芯片 title（悬停提示）
+    ['Swap A and B', '交换 A 和 B'],
+    ['Fly the camera along the route', '让相机沿路线飞行'],
+    ['Place A and B first', '请先放置 A 和 B'],
+    ['Remove the route and both markers', '清除路线与两个标记'],
+    ['Then click the globe to place the start', '然后点击地球放置起点'],
+    ['Then click the globe to place the destination', '然后点击地球放置终点'],
+    ['Click a spot on the globe to place A (click again to cancel)', '点击地球上的位置放置 A（再次点击取消）'],
+    ['Click a spot on the globe to place B (click again to cancel)', '点击地球上的位置放置 B（再次点击取消）'],
+    ['Drive — reroute for drive', '驾车 — 按驾车方式重新规划'],
+    ['Walk — reroute for walk', '步行 — 按步行方式重新规划'],
+    ['Bike — reroute for bike', '骑行 — 按骑行方式重新规划'],
+
+    // 步骤指令骨架（instructionFor 实测形态；道路名是开放域专有名词，保留原文）
+    ['Head out', '出发'],
+    ['Head out on Main St', '出发，沿 Main St'],
+    ['Head out on Main St (I-5)', '出发，沿 Main St (I-5)'],
+    ['Arrive at your destination', '到达目的地'],
+    ['Arrive at your destination, on the left', '到达目的地，在左侧'],
+    ['Arrive at your destination, on the right', '到达目的地，在右侧'],
+    ['Turn left', '向左转'],
+    ['Turn slightly left', '向稍左转'],
+    ['Turn sharply right', '向急右转'],
+    ['Turn left onto Main St', '向左转，进入 Main St'],
+    ['Turn left onto US 101 (US-101)', '向左转，进入 US 101 (US-101)'],
+    ['Turn left onto A1', '向左转，进入 A1'],
+    ['Make a U-turn', '掉头'],
+    ['Make a U-turn onto Main St', '掉头，进入 Main St'],
+    ['Continue', '继续'],
+    ['Continue straight', '继续直行'],
+    ['Continue left', '继续向左行'],
+    ['Continue onto Oak Ave', '继续，进入 Oak Ave'],
+    ['Continue straight onto Oak Ave', '继续直行，进入 Oak Ave'],
+    ['At the end of the road, turn right', '到路尽头后向右转'],
+    ['At the end of the road, continue', '到路尽头后继续直行'],
+    ['Keep left at the fork', '在岔路口靠左行驶'],
+    ['Continue at the fork', '在岔路口继续直行'],
+    ['Merge right onto I-80', '汇入右侧车道，进入 I-80'],
+    ['Take the ramp on the right', '上匝道（靠右）'],
+    ['Take the exit', '驶出出口'],
+    ['At the roundabout, take the 1st exit', '在环岛走第 1 个出口'],
+    ['At the roundabout, take the 12th exit', '在环岛走第 12 个出口'],
+    ['At the roundabout, take the 113th exit', '在环岛走第 113 个出口'],
+    ['Enter the roundabout', '进入环岛'],
+    ['At the roundabout, turn left', '在环岛向左转'],
+    ['Exit the roundabout', '驶出环岛'],
+    ['Use the left lane', '走左侧车道'],
+
+    // 步骤列表与卡片
+    ['Turn-by-turn directions', '逐向导航'],
+    ['Only the first 3 turns of this route are shown', '仅显示本路线的前 3 个转弯'],
+    ['Step 1 of 3', '第 1 步，共 3 步'],
+    ['Then: Arrive at your destination', '然后：到达目的地'],
+    ['Then: Turn left onto Oak Ave', '然后：向左转，进入 Oak Ave'],
+
+    // 明细行复合（directionsStats + runRoute 错误链）
+    ['Routing…', '正在规划路线…'],
+    ['Routing timed out', '路线规划超时'],
+    ['Routing unavailable', '路线服务不可用'],
+    ['Routing unavailable — no response from the routing service', '路线服务不可用 — 未收到路由服务响应'],
+    ['Routing unavailable (HTTP 503)', '路线服务不可用（HTTP 503）'],
+    ['No route found between A and B', 'A 与 B 之间没有可用路线'],
+    ['No route found', '未找到路线'],
+    ['Another map tool is using clicks — close it, then SET A again',
+      '其他地图工具正在占用点击 — 请先关闭它，再重新设 A'],
+    ['OSM routing · Routing…', 'OSM 路径规划 · 正在规划路线…'],
+    ['OSM routing · SET A, then click the globe', 'OSM 路径规划 · 先设 A，再点击地球'],
+    ['OSM routing · Click the globe to place A', 'OSM 路径规划 · 点击地球放置 A'],
+    ['3.2 km · 13 min · Drive', '3.2 km · 13 分钟 · 驾车'],
+    ['3.2 km · 13 min · Drive · first 3 turns', '3.2 km · 13 分钟 · 驾车 · 前 3 个转弯'],
+
+    // 429 透传复合（source.js 拼 `${payload.error} — try again in a moment`；
+    // payload.error 域 = server/routes.js 的 fail()/rateLimited() 消息）
+    ['no route found — try again in a moment', '未找到路线 — 请稍后再试'],
+    ['rate limited — try again in a moment', '请求过于频繁 — 请稍后再试'],
+    ['routing busy — too many routes at once — try again in a moment',
+      '路由繁忙 — 同时请求的路线过多 — 请稍后再试'],
+    ['Routing is rate limited — try again in a moment', '路线请求过于频繁 — 请稍后再试'],
+    ['Routing failed: no route found', '路线规划失败：未找到路线'],
+    ['Routing failed: route too long', '路线规划失败：路线总长过长'],
+    // 复合明细行：reason 段是 429 串，前半又被 em-dash 规则拆出
+    // 'Routing is rate limited' 片段 → 该片段必须有独立词条（否则半译）
+    ['UNAVAILABLE · OSM routing · Routing is rate limited — try again in a moment',
+      '不可用 · OSM 路径规划 · 路线请求过于频繁 — 请稍后再试'],
+
+    // pointerBlockedMessage 的 toast（setArmed 被拒；已知 owner=draw，
+    // 未知 owner 走 `turn <id> off` 兜底，id 是内部标识符保留原文）
+    ['Draw is active — press Escape twice to leave Draw, then set A',
+      '手绘正在使用 — 按两次 Esc 离开手绘，然后设置 A'],
+    ['annotation-placer is active — turn annotation-placer off, then set B',
+      'annotation-placer正在使用 — 关闭 annotation-placer，然后设置 B'],
+  ];
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) {
+      failures.push(
+        `${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`,
+      );
+    }
+  }
+  assert.deepEqual(failures, [], `路径规划图层动态串回归：\n  ${failures.join('\n  ')}`);
+
+  // 反向对照（防「词典整体失灵」假绿）：相邻真实文案确实译出
+  assert.equal(lookup('Directions'), '路径规划');
+  // 刻意保留：A ✓ / B ✓ 是确认态（✓ 符号 + 端点代号）。
+  // dictOnly 的 [A-Za-z]{2,} 守卫使单字母串永远进不了词典——这是结构性保护，
+  // 断言它恒为 null 是弱断言（加死词条也不报红），真正要守住的是「没人给它写规则」：
+  // RULES 里不应出现匹配 A ✓/B ✓ 的正则。用整组 chips 的确定性来锚定。
+  assert.equal(lookup('A ✓'), null, 'A ✓ 不该被翻译（端点代号 + 符号）');
+  assert.equal(lookup('B ✓'), null, 'B ✓ 不该被翻译（端点代号 + 符号）');
+  // 道路名是开放域专有名词：骨架规则不得把 `onto Main St` 整段吞掉
+  assert.equal(lookup('Turn left onto Cedar Ridge Road'), '向左转，进入 Cedar Ridge Road');
 });
 

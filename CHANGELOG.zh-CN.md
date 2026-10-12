@@ -2,6 +2,44 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.7.1 — 2026-10-12
+
+**路径规划图层清欠专轮**（zh-1.7.0「已知欠账」清单的第一项）。这批文案自上游 `d78696d`（2026-09-14，#564 无密钥路径规划）引入起就是英文，潜伏近一个月——载体是**第三片盲区**：`directionsRowControls()` 等纯函数只造对象字面量，`chipGroup.js` / `rowList.js` 逐节点 `set(textContent/title)` 赋值，既无 HTML 模板也无反引号标记，静态门槛与内嵌 HTML 门槛都扫不到。
+
+用例形态全部从源模块**实测**取得（直接 `import()` 调 `instructionFor()` / `directionsRowControls()` / `directionsStats()` / `directionsStepCopy()` / `pointerBlockedMessage()` 枚举真实输出，共 38 种指令骨架 + 8 芯片三态 + 全部复合形态），不是手抄猜写。
+
+### 新增
+
+- **模式与端点芯片** — `DRIVE`/`WALK`/`BIKE`（驾车/步行/骑行）、`SET A`/`SET B`/`CLICK MAP`、`FLY`/`FLYING`/`FLY ···`。`A ✓`/`B ✓` 确认态刻意不译（✓ 符号 + 端点代号）。`CLEAR` 走既有 `CONTEXT_WORDS` 容器消歧（按钮=清除），不动词典。
+- **芯片 title 悬停提示 14 条** — 含 `${word} — reroute for ${word}` 三态复合、放置/交换/飞行/清除、`Then click the globe to place the start|destination` 双形态。
+- **逐向导航指令 38 种骨架**（`src/data/routeSteps.js` 的 `instructionFor`）— 归并为「动词短语」+「onto 道路名」两段规则；道路名是开放域专有名词，过 `tr()` 查不到就保留原文（`Turn left onto Main St` → `向左转，进入 Main St`）。带 `Name (Ref)` 复合形态（`US 101 (US-101)`）实测覆盖。
+- **步骤列表与卡片** — `Turn-by-turn directions`、`Only the first N turns…`、`Step N of M`、`Then: …`、`then 300 m · 2 min` 明细段。
+- **路线摘要与状态串** — `Routing…`/`Routing timed out`/`Routing unavailable`（含 `(HTTP nnn)` 与 `— no response` 形态）、`No route found between A and B`、`Another map tool is using clicks…`、`OSM routing`（→ OSM 路径规划）、coverage 引导串 `SET A, then click the globe` 等。
+- **服务端路由代理错误 9 条**（`server/providers/places/routes.js`，经 `payload.error` 透传）— `no route found`/`invalid profile`/`invalid coordinate`/`need 2-12 coordinates`/`route leg too long`/`route too long`/`route proxy error`/`rate limited`/`routing service is rate limited`/`routing busy…`，及 429 复合 `X — try again in a moment` 与 `Routing failed: X` 透传规则。
+- **pointerBlocked toast** — `<name> is active — <leave>, then set <A|B>` 整串规则；已知 owner=draw（`press Escape twice to leave Draw`），未知 owner 走 `turn <id> off` 兜底（id 保留原文）。
+
+词典 **1034 → 1073**（+39，其中 6 条为 429 片段/独立 fallback 形态），规则 **179 → 212**（+33）。
+
+### 修复与发现
+
+- **复合串被 em-dash 规则「先斩后奏」的半译链**：`UNAVAILABLE · OSM routing · Routing is rate limited — try again in a moment` 这种三段复合，会被 `— try again in a moment` 规则在 `translateSegments` **之前**接住，捕获组拿到的是 `UNAVAILABLE · OSM routing · Routing is rate limited`——`trKeep` 内部的 `lookup` 把前两段译了，但第三段 `Routing is rate limited` 作为**片段**没有词条 → 产出「不可用 · OSM 路径规划 · Routing is rate limited — 请稍后再试」。修法：给片段补独立词条。这个模式记进了技能（4j 补充）：**复合串里以 em dash 收尾的段，其前半片段也要能独立查到**。
+- **`Continue onto X` 无方向修饰 ≠ `Continue straight onto X`**：`new name` 机动类型产出的是裸 `Continue onto X`（实测），语义是单纯「继续」而非「直行」——初版断言写错，靠探针实测纠正。
+- **`A ✓` 加词条是死词条**：`dictOnly` 的 `[A-Za-z]{2,}` 守卫使单字母串永远进不了词典。这是结构性保护（短标签不误译），相应断言注明是弱断言，真正的防线是「没人给它写规则」。
+
+### 门槛强化
+
+- 新增测试 **`路径规划图层：chips / 步骤指令 / 状态串必须译出（第三片盲区清欠）`** — **80 条用例**全部取自源模块实测形态，含 3 条开放域道路名保护断言（`onto Cedar Ridge Road` 保留原文）与 2 条不译断言。汉化门槛 25 → **26 例**。
+- 探针全集 98 条：**96 命中 / 2 刻意不译**（`A ✓`/`B ✓`）；6 条「译文含英文」判读项全部为道路名/内部 ID/HTTP 码（专有名词，正确保留）。
+- 反向验证 3 次全部精确报红：删 `SET A` 词条 → 报红；`Turn` 规则改永不匹配 → 报红；`A ✓` 死词条实验证实 `dictOnly` 守卫后还原（该方向的反向验证以「结构性不可达」结案，非断言失效）。
+- 浏览器 QA 碰撞排查：`qa-directions.mjs` 断言读的是 `module.getRowControls()` 模块对象**非 DOM 文本**，汉化层够不到 → 无碰撞。其余手动 QA 脚本断言的串全是历史词条（`KEY REQUIRED` 2026-10-09 / `Mapped installations` 2026-09-02 / `Select a box…` 2026-09-28），本轮零新增碰撞。CI 只跑已 pin 的 street-level/panel-resize 两个。
+- 三道补全前核查记录在案：候选词（含小写 drive/walk/bike/fly/map/swap/set）全部不在 28 个 material-symbols 图标连字清单里；小写形态 grep 确认不作可见文本；`SWAP`/`MAP` 既有词条属近期影像/地图源语境，大小写与语境均不撞车。
+- 验证：门槛 **26/26**；完整 `npm test` **6269 / 6258 pass / 1 fail / 10 skip**（那 1 个 fail 仍是上游 win32 平台缺陷 `Codex login…`，非汉化回归）；`build` ✓（26.75s）；`check:boundaries` ✓；`format:check` ✓（1307 文件）。
+
+### 已知限制（本轮明确不处理的）
+
+- **canvas 卡片的 `Step N of M · then …` / `Then: …`**（`createDirectionsStepOverlayEntry` → `worldOverlayDraw.js` 的 `fillText`）：overlay 系统是 canvas 绘制，MutationObserver 抓不到任何文本节点——这是运行时 DOM 注入方案的**硬边界**，规则已备好（list 载体走 `rowList.js` 进 DOM，能译），canvas 卡片只能保持英文，除非上游改用 DOM 卡片。
+- zh-1.7.0 清单剩余欠账：近期影像 `notes()`/`guidance()` 3 条 + AIS 首连提示 2 条（规模小，下轮同步顺手补）。
+
 ## zh-1.7.0 — 2026-10-12
 
 同步上游 23 个提交（50 文件，+1337/-145）后的汉化补全。上游无冲突，汉化补丁文件独立。**本轮上游主要内容是数据源可用性重构（#982–#986）**：把「数据源没配置」与「数据源返回空数据集」区分开，新增 `src/app/sourceComposition.js` 的 `CATALOG_SOURCE_CONTRACTS` 契约表与 `createAvailabilityLookup()`，把路径规划、近期影像的取数从应用装配里拆成可替换的 source 模块，并让街景图层的 provider 开关走稳定的 ID 编解码（`src/data/idSwitches.js`）进分享链接。
