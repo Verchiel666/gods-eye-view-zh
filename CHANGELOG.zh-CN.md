@@ -2,6 +2,32 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.7.0 — 2026-10-12
+
+同步上游 23 个提交（50 文件，+1337/-145）后的汉化补全。上游无冲突，汉化补丁文件独立。**本轮上游主要内容是数据源可用性重构（#982–#986）**：把「数据源没配置」与「数据源返回空数据集」区分开，新增 `src/app/sourceComposition.js` 的 `CATALOG_SOURCE_CONTRACTS` 契约表与 `createAvailabilityLookup()`，把路径规划、近期影像的取数从应用装配里拆成可替换的 source 模块，并让街景图层的 provider 开关走稳定的 ID 编解码（`src/data/idSwitches.js`）进分享链接。
+
+上游**未动任何 HTML 模板**，`package-lock.json` 也未变（`package.json` 只新增两条 `exports` 子路径映射）→ 无需 `npm install`。
+
+### 新增
+
+- **数据源可用性 reason 链路**（`src/app/sourceComposition.js` → `src/data/lifecycle.js` → `src/ui/layerPanel.js` / `src/ui/contextLayerChanges.js`）— 上游给每个消费图层的 `getSourceAvailability()` 造出 `reason`，`lifecycle.js` 的 `_normalizedStats()` 把它写进 `stats.error` 并置 `sourceUnavailable: true`，于是同一条 reason 会在**三处**渲染：图层明细行 `UNAVAILABLE · <source> · <reason>`、开关芯片的 `title`/`aria-label`（`String(layer.stats.error || 'Data source unavailable')`）、以及 `_visibilityBlockReason()` 返回后经 `contextLayerChanges.js` 的 `showToast()` 弹出的 toast。补齐 `Data source unavailable`（数据源不可用）、`No street-level imagery providers configured`（未配置任何街景影像数据源），以及 reason 的两种复合形态：`${layer.name}: data source not configured`（图层名走词典，故捕获段用 `tr()` 而非 `trKeep()`，避免某个图层名恰好缺词条时整条规则放弃）与 `Data source not configured: ${name}`（`${name}` 是 `CATALOG_SOURCE_CONTRACTS` 的内部 slug，保留原文；该串会被近期影像的 `notes()` 拼成 `${label} catalog unavailable · ${error.message}` 透传，故必须能独立查到）。
+- **`PARTIAL` feed 徽标**（`src/ui/layerPanel.js` 的 `FEED_STATE_LABELS`）— 长期缺失的既有欠账：该表有 7 个状态，其余 6 个（`ON`/`LOADING`/`DEGRADED`/`STALE`/`FALLBACK`/`UNAVAILABLE`）都在词典，唯独 `partial` 漏了，芯片因此显示英文 `PARTIAL`。小写 `partial` 经 grep 核实只作 `layerFeedState()` 返回值与 CSS class，不作可见文本渲染，`dictOnly` 大写兜底不会误伤。
+- 词典从 1031 条扩充到 **1034 条**（+3），动态串规则 177 → **179 条**（+2）。
+
+### 门槛强化
+
+- 新增测试 **`数据源可用性 / PARTIAL 徽标：#982–#986 新增的 reason 链路必须译出`** — 10 条正向用例全部取自源码真实拼接形态（含三条 `UNAVAILABLE · <source> · <reason>` 复合明细行），外加 `PARTIAL · Live Vessels · 12 of 40 records accepted · 3m ago` 的正向对照（确认 `translateSegments` 逐段命中，而非 `lookup` 整体失灵造成的假绿）。
+- 内置**刻意不译清单** 6 条：`Catalog sources must be an object` / `Source overrides must be an object` / `Invalid boolean switch IDs` / `Directions require a route source` / `Street Level providers must be an array` / `Street Level provider IDs cannot fit in the 256-character share-link field…`。逐条追过调用链确认它们是**构建期守卫**（`resolveCatalogSources()`、`createStandaloneLayerSources()`、`encodeIdSwitches()`、`validateProviders()` 的入口断言），没有任何 UI 层 `try/catch` 接住它们渲染成 toast 或状态行，只有开发者在控制台与测试里看得到。若哪天上游把它们接进 UI，这条断言会报红提醒重新评估可见性。
+- 汉化门槛测试从 24 例增至 **25 例**。静态模板覆盖维持 **412/412 = 100%**，JS 内嵌 HTML 覆盖维持 **101/101 = 100%**（上游本轮未动模板、未新增 innerHTML 模块；两个条数均由采集函数实测打印得出，其中 412 修正了上一版记录里误写的 413）。
+- 三次反向验证全部精确报红：删 `PARTIAL` 词条 → 报红指出该条；把 reason 规则改成永不匹配 → 报红；给构建期守卫串加词条 → 「刻意不译清单」断言报红。
+
+### 已知欠账（本轮扫出，未处理）
+
+- **第三片盲区：chips 经纯函数对象 + `set(node, 'textContent')` 逐节点构建，静态门槛与内嵌 HTML 门槛都扫不到。** `src/ui/chipGroup.js` 用 `set(button,'textContent',chip.label)` / `set(button,'title',chip.title)` 赋值，没有任何 HTML 模板或反引号标记可匹配。受影响的是**路径规划图层的整套 chips 文案**（`DRIVE`/`WALK`/`BIKE`、`SET A`/`SET B`/`CLICK MAP`/`A ✓`/`B ✓`、`FLY`/`FLYING`/`FLY ···`、`Swap A and B`、`Fly the camera along the route`、`Place A and B first`、`Remove the route and both markers`、`Then click the globe to place the start|destination`、`Click a spot on the globe to place A|B (click again to cancel)`、`Turn-by-turn directions`、`Only the first N turns of this route are shown`、`Step N of M · then …`、`Then: …`，以及 `${word} — reroute for ${word}` 与 `Routing…`/`Routing timed out`/`Routing unavailable (HTTP nnn)`/`No route found between A and B` 等状态串）。
+  - **这些是既有欠账，不是本轮引入的退化**：`directionsRowControls()` 自上游 `d78696d`（2026-09-14，#564 无密钥路径规划）引入起就是英文，因本轮 diff 触及 `src/layers/directions/` 才被 `scan-diff-strings.mjs` 扫出。
+  - 未在本轮补的原因：需要新增一个采集器（扫对象字面量的 `label`/`title`/`text`/`ariaLabel`/`details` 等可见键）+ 逐条核对小写碰撞与图标连字（`fly`/`map`/`swap`/`set` 都是常用词），规模与风险都超过同步自动化的职责范围，适合单开一轮人工专做。工作产物 `.workbuddy/scan-row-controls.mjs` 已能枚举全部候选（含三元表达式两个分支），可直接接着用。
+- **近期影像面板的 3 条 notes 与 AIS 首连提示**同为既有欠账：`Catalog truncated · a newer clear day may exist`、`Daily overview for today may still be empty until the pass`、`Imagery catalog unavailable`（`src/layers/recentImagery/index.js` 的 `notes()`/`guidance()`，经 `src/ui/recentImagery.js` 逐行 push 进面板）、`awaiting usable AIS positions…` / `awaiting first AIS message…`（`src/layers/vessels/lifecycle.js`、`queries.js`，进 `stats.error`）。已在 `9128f6e` 存在，同样适合并入上述专轮。
+
 ## zh-1.6.0 — 2026-10-09
 
 同步上游 22 个提交（33 文件，+2491/-38）后的一轮汉化补全，同时补上 2026-10-08 合并（`fd1288c`，街景图层）遗留的欠账。上游无冲突，汉化补丁文件独立。**本轮上游主要内容是 ChatGPT/Codex OAuth 语音认证（#621，实验性）与矢量瓦片原点跟随 TileJSON 配置（#933/#935）**。本轮真正的重头戏是发现并堵住了覆盖率门槛的**第二片结构性盲区**。

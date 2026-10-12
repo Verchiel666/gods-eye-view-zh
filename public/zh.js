@@ -727,6 +727,11 @@
     'UNAVAILABLE': '不可用',
     'DEGRADED': '降级',
     'FALLBACK': '回退',
+    // PARTIAL 长期缺失：layerPanel.js 的 FEED_STATE_LABELS 有 7 个状态，
+    // 其余 6 个都在词典，唯独 partial 漏了 → 芯片显示英文 PARTIAL。
+    // 小写 'partial' 在上游只作 layerFeedState() 的返回值与 CSS class，
+    // 不作为可见文本渲染（已 grep 核实），dictOnly 大写兜底不会误伤。
+    'PARTIAL': '部分数据',
     'LIVE': '实时',
     'SIMULATED': '模拟',
     'ENABLING': '启用中',
@@ -1072,6 +1077,26 @@
     'Transit': '公共交通',
     'Wind': '风场',
 
+    // ===== 数据源可用性（2026-10-12 上游 #982–#986 新增的 source-availability 链路）=====
+    // 上游把「数据源没配置」和「数据源返回空」区分开了：
+    //   src/app/sourceComposition.js  createAvailabilityLookup() 给每个消费图层的
+    //   getSourceAvailability() 造 reason；src/data/lifecycle.js 的 _normalizedStats()
+    //   把 reason 写进 stats.error + sourceUnavailable:true；
+    //   src/ui/layerPanel.js 于是显示：
+    //     · 明细行  `UNAVAILABLE · <source> · <reason>`
+    //     · 芯片 title/aria-label  `String(layer.stats.error || 'Data source unavailable')`
+    //     · _visibilityBlockReason() 返回的 reason 还会经 contextLayerChanges.js
+    //       showToast() 弹成 toast
+    // 三处都渲染，reason 缺词条 → 操作员看到英文长串。
+    'Data source unavailable': '数据源不可用',
+    'No street-level imagery providers configured': '未配置任何街景影像数据源',
+    // `${layer.name}: data source not configured`（sourceComposition.js 的 reason）
+    // layer.name 已在词典（Directions/Recent Imagery 靠 dictOnly 大写兜底），
+    // 整串由 RULES 的 `: data source not configured` 分支覆盖——该串从不单独渲染，
+    // 故这里**不加**裸 'data source not configured' 词条（会是查不到出处的幽灵键）。
+    // `${name}` 是 SourceUnavailableError.message，会经 recentImagery 的
+    // `${label} catalog unavailable · ${error.message}` 透传，故保留可独立查到的形态。
+
     // ===== OAuth 语音认证的服务端错误消息 =====
     // server/providers/openai/codex-auth.js 与 realtime.js 抛出的这些消息，
     // 经 fetch 响应体的 payload.error 透传进 keySetup.js 的 say()，
@@ -1396,6 +1421,25 @@
       return '目标周边 ' + m[2] + ' 公里内有 ' + m[1] + ' 处已标注设施';
     }],
     [/^WITHIN (\d+) KM$/, function (m) { return '半径 ' + m[1] + ' 公里内'; }],
+
+    // ===== 数据源可用性 reason 的两种复合形态（2026-10-12 上游 #982–#986 新增）=====
+    // ① sourceComposition.js createAvailabilityLookup()：
+    //      reason = `${layer.name || id}: data source not configured`
+    //    layer.name 已在词典（'Directions'→路径规划；'Recent Imagery' 靠 dictOnly
+    //    大写兜底命中 'RECENT IMAGERY'），所以捕获段用 tr() 而非 trKeep()——
+    //    用 trKeep 会在某个图层名恰好缺词条时让整条规则放弃，操作员看到完整英文长串。
+    //    id 兜底（如 'ais-live-vessels'）是内部标识符，查不到就原样保留，正确。
+    // ② SourceUnavailableError.message = `Data source not configured: ${name}`，
+    //    name 是 CATALOG_SOURCE_CONTRACTS 的键（'recent-imagery'/'directions' 等
+    //    slug 形态的内部标识符，不是可见文案），保留原文。
+    //    这条会被 recentImagery 的 notes() 拼成
+    //    `${label} catalog unavailable · ${error.message}`，故必须独立可查。
+    [/^(.+): data source not configured$/, function (m) {
+      return tr(m[1]) + '：数据源未配置';
+    }],
+    [/^Data source not configured: (.+)$/, function (m) {
+      return '数据源未配置：' + m[1];
+    }],
 
     // 瓦片 / 上游错误带 HTTP 状态码（src/sources/vectorTiles.js、src/layers/traffic/source.js、flow.js）
     [/^Vector tiles unavailable \(HTTP (\d+)\)$/, function (m) { return '矢量瓦片不可用（HTTP ' + m[1] + '）'; }],

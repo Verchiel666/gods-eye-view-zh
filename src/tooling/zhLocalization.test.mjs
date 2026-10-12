@@ -1325,3 +1325,67 @@ test('街景 / OAuth 语音 / 语音卡片动态串必须译出', () => {
   assert.equal(lookup('Weather map'), null, 'MCP 工具 title 被误译（它不进浏览器 UI）');
 });
 
+test('数据源可用性 / PARTIAL 徽标：#982–#986 新增的 reason 链路必须译出', () => {
+  const { lookup } = loadPatch();
+
+  // 2026-10-12 上游 #982–#986 把「数据源没配置」与「返回空数据集」区分开：
+  // sourceComposition.js 造 reason → lifecycle.js 写进 stats.error + sourceUnavailable
+  // → layerPanel.js 渲染成明细行 `UNAVAILABLE · <source> · <reason>`、
+  //   芯片 title/aria-label、以及经 contextLayerChanges.js showToast() 的 toast。
+  // reason 缺词条 → 操作员在三处看到英文长串。静态门槛只扫模板，看不到这批 JS 现拼串。
+  const cases = [
+    // feed 徽标补漏：FEED_STATE_LABELS 有 7 态，PARTIAL 曾长期缺失
+    ['PARTIAL', '部分数据'],
+
+    // reason 两种形态（sourceComposition.js / SourceUnavailableError.message）
+    ['Data source unavailable', '数据源不可用'],
+    ['No street-level imagery providers configured', '未配置任何街景影像数据源'],
+    ['Directions: data source not configured', '路径规划：数据源未配置'],
+    ['Recent Imagery: data source not configured', '近期影像：数据源未配置'],
+    // `${name}` 是内部 slug（CATALOG_SOURCE_CONTRACTS 键），保留原文
+    ['Data source not configured: directions', '数据源未配置：directions'],
+    ['Data source not configured: recent-imagery', '数据源未配置：recent-imagery'],
+
+    // 复合形态：明细行 `UNAVAILABLE · <source> · <reason>` 整条都要译出
+    ['UNAVAILABLE · Street Level · No street-level imagery providers configured',
+      '不可用 · 街景 · 未配置任何街景影像数据源'],
+    ['UNAVAILABLE · OSM routing · Directions: data source not configured',
+      '不可用 · OSM routing · 路径规划：数据源未配置'],
+    ['UNAVAILABLE · Recent Imagery · Recent Imagery: data source not configured',
+      '不可用 · 近期影像 · 近期影像：数据源未配置'],
+  ];
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) {
+      failures.push(
+        `${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`,
+      );
+    }
+  }
+  assert.deepEqual(failures, [], `数据源可用性动态串回归：\n  ${failures.join('\n  ')}`);
+
+  // 反向对照（防止用例因「词典整体失灵」而假绿）：
+  // PARTIAL 规则确实生效，而不是碰巧保留原文——同段其它徽标必须仍译出。
+  assert.equal(lookup('UNAVAILABLE'), '不可用');
+  assert.equal(lookup('FALLBACK'), '回退');
+  // PARTIAL 的复合行里，PARTIAL 段自身也必须译出（translateSegments 逐段命中）
+  assert.equal(lookup('PARTIAL · Live Vessels · 12 of 40 records accepted · 3m ago'),
+    '部分数据 · 实时船舶 · 40 条记录中已接受 12 条 · 3 分钟前');
+
+  // 刻意不译清单：构建期守卫的 TypeError/RangeError 消息，UI 从不捕获渲染，
+  // 只有开发者在控制台/测试里看得到。给它们加词条纯属噪声，且会污染「防过宽」门槛。
+  // 若哪天上游把它们接进 toast，这条会报红提醒重新评估可见性。
+  const devOnly = [
+    'Catalog sources must be an object', // sourceComposition.js resolveCatalogSources 入口守卫
+    'Source overrides must be an object', // layerSources.js createStandaloneLayerSources 守卫
+    'Invalid boolean switch IDs', // idSwitches.js encodeIdSwitches 守卫
+    'Directions require a route source', // directions/index.js 装配守卫
+    'Street Level providers must be an array', // streetLevel/registry.js 守卫
+    'Street Level provider IDs cannot fit in the 256-character share-link field; use shorter IDs or fewer providers', // registry.js RangeError
+  ];
+  for (const text of devOnly) {
+    assert.equal(lookup(text), null, `构建期守卫消息被误译（UI 不渲染，不该有词条）：${JSON.stringify(text)}`);
+  }
+});
+
