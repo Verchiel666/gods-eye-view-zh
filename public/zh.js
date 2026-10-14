@@ -887,6 +887,10 @@
     // 覆盖统计（presentMeta）
     'Switch a provider on to draw its coverage.': '开启任一数据源即可绘制其覆盖范围。',
     'Loading this sequence…': '正在加载该序列…',
+    // presentMeta 复合串 `${count} sequences in view · click a line for its photos · ${hint}`
+    // 的第二段。既有欠账（自上游 2dbc684 重命名街景层起就是英文）：
+    // translateSegments 逐段查词典，缺这一段会让整条明细行半中半英。
+    'click a line for its photos': '点击线条可查看其照片',
     // SINCE 档位标签（SINCE_STOPS，label 直出到 output 元素）
     'LAST 10 YEARS': '近 10 年', 'LAST 5 YEARS': '近 5 年', 'LAST 3 YEARS': '近 3 年',
     'LAST 2 YEARS': '近 2 年', 'LAST YEAR': '近 1 年',
@@ -895,6 +899,61 @@
     'Mapillary graph': 'Mapillary 图数据',
     'Mapillary status': 'Mapillary 状态',
     'Mapillary token not configured': 'Mapillary 令牌未配置',
+
+    // ===== Google 街景数据源（2026-10-14 上游新增 providers/google/）=====
+    // 品牌名与 chip label 保留原文，与 'MAPILLARY' 的既有处理一致（见下方规则注释）。
+    // 静态模板里的 OPEN STREET VIEW 是按钮初始占位（hidden），运行时被
+    // presentNearest() 的 `OPEN ${labels}` 覆盖成 OPEN GOOGLE STREET VIEW。
+    'OPEN STREET VIEW': '打开街景',
+    // 地面点击提示（GROUND_CLICK_HINT → coverageStats().hint → presentMeta 的明细行）
+    'click a street to open Street View': '点击街道即可打开街景',
+    // openNearest() 瞄准天空时的 street.error（AIM_AT_GROUND_MESSAGE）
+    'Aim the middle of the view at a street to look for imagery there':
+      '请把视野中心对准街道，再查找该处影像',
+    // 密钥被拒（KEY_REJECTED_MESSAGE）：既写进 street.error / chip title，
+    // 也经 context.actions.reportError() 弹 toast，三处同一条串。
+    'Google refused GOOGLE_MAPS_API_KEY for Street View — check that the Maps JavaScript API is enabled for it and this site is an allowed referrer':
+      'Google 拒绝了用于街景的 GOOGLE_MAPS_API_KEY — 请确认已为该密钥启用 Maps JavaScript API，且本站在允许的来源列表中',
+    // 超时（NO_ANSWER_MESSAGE）：viewer.js 与 index.js 各自 throw，
+    // 经 viewerHost.open() 的 catch 写进 street.error 渲染到面板。
+    'Street View did not answer — check the network, and that the Maps JavaScript API is enabled for GOOGLE_MAPS_API_KEY':
+      '街景无响应 — 请检查网络，并确认已为 GOOGLE_MAPS_API_KEY 启用 Maps JavaScript API',
+    // mapsLoader.js 的两条 reject：无密钥 / 脚本加载失败，同上路径渲染
+    'GOOGLE_MAPS_API_KEY is not set': '未设置 GOOGLE_MAPS_API_KEY',
+    'The Google Maps JavaScript API could not load': 'Google Maps JavaScript API 加载失败',
+    // viewer.js 的三条：挂载竞态、该处无影像、未挂载竞态，同经 street.error 渲染
+    'Street View was unmounted': '街景查看器已被卸载',
+    'Street View has no imagery for this place': '该地点没有街景影像',
+    'Street View is not mounted': '街景查看器尚未挂载',
+    // 刻意不译（逐条追调用链确认无 UI 渲染路径）：
+    //   'Street Level viewer has no host element'（viewer.js mount 的入参守卫——
+    //     viewerHost.open() 已先判 !state.street.host 并改设自己的兜底串，
+    //     prewarm() 的 catch 直接吞掉，两处都到不了面板）
+    //   'Google Street View needs getApiKey'（createGoogleProvider 的 TypeError，
+    //     在 constructCatalog 装配期抛出，应用根本没起来，同 2026-10-12 那批构建期守卫）
+    // viewerHost.js 的三条既有欠账（自 28e6a1f / 6207e41 起就是英文，本轮顺手清）：
+    // 面板未展开时的兜底、open() 的 catch 兜底、mount 竞态
+    'Open the Street Level panel to view imagery': '请展开街景面板以查看影像',
+    'Image could not be opened': '照片无法打开',
+    'Street-level viewer was closed': '街景查看器已关闭',
+
+    // ===== 密钥设置面板：各密钥「可解锁什么」（keySetupCore.mjs 的 unlocks）=====
+    // src/keySetup.js 把 unlocks 直接 textContent 进 .key-setup-unlocks 段落。
+    // 上游本轮把 google-maps 那条改成了含 Street View 的新文案；其余 8 条是既有欠账
+    // （只有 cesium-ion 的 'Bing imagery map stacks + world terrain' 早已收录，见上方）。
+    'The photorealistic 3D planet, place search + Street View':
+      '写实 3D 地球、地点搜索 + 街景',
+    'Places context + Street View fallback; optional separate key':
+      '地点上下文 + 街景兜底；可选的独立密钥',
+    'Voice control — API key or ChatGPT OAuth': '语音控制 — API 密钥或 ChatGPT OAuth',
+    'Live ships, worldwide': '全球实时船舶',
+    'Live active-fire detections': '实时活跃火点探测',
+    'Real live traffic (keyless runs a simulation)': '真实实时路况（免密钥时运行模拟）',
+    'More flight-polling credits (anonymous works without)':
+      '更多航班轮询额度（匿名也可用）',
+    'Street-level imagery and coverage in the Street Level layer. Free: register an app in the Mapillary developer dashboard and paste its Client Token':
+      '街景图层中的街景影像与覆盖范围。免费：在 Mapillary 开发者后台注册一个应用，并粘贴其 Client Token',
+    'Higher space-missions request allowance': '更高的太空任务请求额度',
 
     // ===== ChatGPT OAuth 语音认证（2026-10-09 上游 #621 新增）=====
     // src/keySetup.js 在密钥设置面板里插入认证方式切换控件；
@@ -1207,6 +1266,35 @@
   function joinZh(prefix, rest) {
     var r = tr(rest);
     return prefix + (/[一-鿿]/.test(r.charAt(0)) ? '' : ' ') + r;
+  }
+
+  /* keySetupWithAlternatives()（2026-10-14 上游新增）的 offer 段：`, or ` 分隔的
+     多段 `light LABEL to use your NAME key` / `light LABEL`。
+     LABEL 是数据源 label（'MAPILLARY'），NAME 是密钥标题的首字母大写形态
+     （'Mapillary'/'Opensky'）——两者都是专有名词，只译句式。
+     任一段译不出就整体放弃（返回 null），避免「需要 X，或 light MAPILLARY…」半译。
+     刻意收窄到这两种句式而不是 /^light (.+)$/：飞机分类标签 'Light aircraft'
+     （src/data/aircraftClass.js）也是 Light 开头，宽规则会把它搅进来。
+     返回值不含「或」前缀，由调用方决定（复合串要带，整句开头不带）。 */
+  function trAlternatives(offer) {
+    // 注意：这段代码落在门槛「词典无重复键」扫描的区块内（它从 var DICT 一直扫到
+    // 动态串规则注释），而它的键提取正则会认任何 `引号对 + 冒号` 形态——
+    // 所以此处与注释里都不能出现「空字符串紧跟冒号」的写法，否则会被当成空键。
+    var parts = String(offer || '').split(', or ');
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var seg = parts[i].trim();
+      if (!seg) continue;
+      var withKey = seg.match(/^light ([A-Z][A-Z0-9 —]*) to use your ([A-Z][\w]*) key$/);
+      if (withKey) {
+        out.push('点亮 ' + withKey[1] + ' 以使用你的 ' + withKey[2] + ' 密钥');
+        continue;
+      }
+      var bare = seg.match(/^light ([A-Z][A-Z0-9 —]*)$/);
+      if (bare) { out.push('点亮 ' + bare[1]); continue; }
+      return null;
+    }
+    return out.length ? out.join('，或') : null;
   }
 
   /* 语音卡片里的目标类别名词（src/voice/speech.js 的 LAYER_NOUNS，取值域封闭）。
@@ -1525,14 +1613,62 @@
     }],
     // chip 的错误/密钥提示：`${provider.name}: ${原因}`
     // 原因是内部串（keySetupRequirement 或 provider.error），捕获组过 tr 让已收录的能译出。
-    [/^(Mapillary): (.+)$/, function (m) { return m[1] + ': ' + tr(m[2]); }],
+    // 2026-10-14 上游新增 Google 街景数据源，name 取值域从 1 个变成 2 个。
+    [/^(Mapillary|Google Street View): (.+)$/, function (m) { return m[1] + ': ' + tr(m[2]); }],
     // keySetupCore.mjs 的密钥缺失提示：`Needs ENV_VAR — add it in Provider Settings`
     [/^Needs (.+?) — add it in Provider Settings$/, function (m) {
       return '需要 ' + m[1] + ' — 请在「数据源配置」中添加';
     }],
+    // keySetupWithAlternatives()（2026-10-14 上游新增）在上面那条后面追加
+    // `, or light LABEL to use your Name key`，可叠加多个（`, or ` 连接）；
+    // requirement 为空时只剩 offer，且首字母被上游改成大写 `Light ...`。
+    // LABEL 是数据源 label（全大写，如 'MAPILLARY'），Name 是密钥标题的首字母
+    // 大写形态（'Mapillary'/'Opensky'）——都是专有名词，只译句式。
+    // 正则用全大写字符类限定，刻意不写成 /^Light (.+)$/：飞机分类标签
+    // 'Light aircraft'（src/data/aircraftClass.js）也是 Light 开头，宽规则会搅进来。
+    [/^(Needs .+? — add it in Provider Settings), or (light .+)$/, function (m) {
+      var offer = trAlternatives(m[2]);
+      return offer === null ? null : tr(m[1]) + '，或' + offer;
+    }],
+    [/^Light ([A-Z][A-Z0-9 —]*) to use your ([\w]+) key$/, function (m) {
+      return '点亮 ' + m[1] + ' 以使用你的 ' + m[2] + ' 密钥';
+    }],
+    [/^Light ([A-Z][A-Z0-9 —]*)$/, function (m) { return '点亮 ' + m[1]; }],
     // 覆盖统计（presentMeta）。数字经 toLocaleString 带千分位逗号，捕获组要允许逗号。
     [/^([\d,]+) images in this sequence$/, function (m) { return '本序列有 ' + m[1] + ' 张照片'; }],
     [/^([\d,]+) sequences in view$/, function (m) { return '视野内有 ' + m[1] + ' 条序列'; }],
+
+    // ===== Google 街景数据源的动态串（2026-10-14 上游新增）=====
+    // presentNearest() 的按钮 label：`OPEN ${labels}`。labels 是数据源 label
+    // （全大写品牌名，多个用 ' / ' 连接），保留原文，只译动词。
+    // 模板里的初始文本 OPEN STREET VIEW 已收在词典（按钮 hidden 态的占位）。
+    [/^OPEN ([A-Z][A-Z0-9 —]*(?: \/ [A-Z][A-Z0-9 —]*)*)$/, function (m) {
+      return '打开 ' + m[1];
+    }],
+    // presentNearest() 的 title 两态（names 是 provider.name，专有名词保留）
+    [/^Open (.+) at the centre of the view$/, function (m) {
+      return '在视野中心打开 ' + m[1];
+    }],
+    [/^Zoom in to a street to open (.+) here$/, function (m) {
+      return '放大到街道即可在此打开 ' + m[1];
+    }],
+    // hintFor()（index.js）：地面点击数据源在相机太高时替换 hint
+    [/^zoom in to a street to open (.+)$/, function (m) {
+      return '放大到街道即可打开 ' + m[1];
+    }],
+    // unavailableReason()（index.js）：`needs the Google 3D map: choose it under MAP SOURCE`
+    // 与既有 'Camera follow needs the Google 3D map: choose Google 3D under MAP SOURCE'
+    // 术语保持一致（「地图源」）。
+    [/^(.+) needs the Google 3D map: choose it under MAP SOURCE$/, function (m) {
+      return m[1] + ' 需要 Google 3D 地图：请在「地图源」中选择';
+    }],
+    // openNearest() 找不到影像时的 street.error。两个分支的地点词都是封闭枚举
+    // （'that point' / 'the view centre'），半径是 policy.js 的 NEAREST_RADIUS_M。
+    [/^No street-level imagery within ([\d,]+) m of (that point|the view centre)$/,
+      function (m) {
+        return (m[2] === 'that point' ? '该点' : '视野中心') +
+          ' ' + m[1] + ' 米范围内没有街景影像';
+      }],
     // 照片署名：`Image by ${creator}`（作者名保留原文）
     // 术语跟随 PR #1（1bcb13a）已发布的译法：街景语境一律用「照片」而非「图像」，
     // 与 'Image fit'→照片适配、'Close the street-level image'→关闭街景照片 保持一致。

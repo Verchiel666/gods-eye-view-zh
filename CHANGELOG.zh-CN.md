@@ -2,6 +2,44 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.8.0 — 2026-10-14
+
+**同步上游 Google 街景数据源**（`providers/google/`，18 个上游提交，62 文件 +4547/-177）。上游为街景图层接入 Google Street View：新 provider 全套（mapsLoader/viewer/policy/groundClick）、`OPEN STREET VIEW` 键盘入口按钮、`keySetupWithAlternatives()` 密钥替代引导、`unlocks` 文案更新。
+
+静态门槛首跑即报红（`OPEN STREET VIEW` 未汉化，1/413）；diff 串扫描 + vm 探针实测出 33 条未译（含多条既有欠账），全部补齐。用例形态全部从上游模块**实测**取得（直接 `import()` 调 `keySetupWithAlternatives()` / `presentNearest()` / policy 常量还原真实拼接），再经 `probe-lookup.mjs` 复核期望值。
+
+### 新增
+
+- **`OPEN STREET VIEW` 按钮全链路** — 模板占位文本 + 运行时 `OPEN ${labels}` 覆盖形态（`OPEN GOOGLE STREET VIEW`、多源 ` / ` 连接）；title 两态（`Open … at the centre of the view` / `Zoom in to a street to open … here`）；`hintFor()` 的小写 hint 形态。label/name 是品牌名保留原文，只译动词（与 chip `GOOGLE STREET VIEW ↗` 保留原文的既有口径一致）。
+- **google/policy.js 三条消息常量** — 密钥被拒 / 超时无响应 / 地面点击提示。密钥被拒那条同串渲染三处（`street.error` 明细行、chip title、`reportError()` toast），词条一处生效。
+- **mapsLoader / viewer 的 reject 消息 5 条** — `GOOGLE_MAPS_API_KEY is not set`、`The Google Maps JavaScript API could not load`、`Street View has no imagery for this place`、`Street View was unmounted`、`Street View is not mounted`。前两条与后三条经 `viewerHost.open()` 的 catch 写进 `street.error` 渲染到面板，是真可见串。
+- **`keySetupWithAlternatives()` 引导串**（本轮上游新增函数）— `Needs X — add it in Provider Settings, or light LABEL to use your Name key` 复合形态（可 `, or ` 叠加多个）与 requirement 为空时的 `Light LABEL …` 首字母大写形态。新增 `trAlternatives()` 辅助函数统一解析 offer 段，任一子段译不出整条放弃（防半译）。
+- **`unavailableReason()` 地图源提示** — `X needs the Google 3D map: choose it under MAP SOURCE`，术语与既有 `Camera follow needs…` 一致（「地图源」）。
+- **`openNearest()` 无影像兜底** — `No street-level imagery within 50 m of that point|the view centre`（两分支封闭枚举写进正则）。
+- **`Aim the middle of the view at a street…`** — 瞄准天空时的 `street.error`。
+- **密钥面板 `unlocks` 全集 10 条**（`keySetup.js` 直接 `textContent` 渲染）— 本轮 google-maps 那条被上游改文案（+ Street View），其余 8 条是既有欠账（仅 cesium-ion 的早已收录），一并补齐。
+
+### 清欠（既有欠账，本轮顺手）
+
+- **`click a line for its photos`** — presentMeta 三段复合串的第二段，自上游 `2dbc684`（街景层重命名）起缺词条，导致整条明细行半中半英（`视野内有 2,514 条序列 · click a line for its photos · …`）。本轮 diff 触及该拼接点被扫出。
+- **viewerHost.js 三条** — `Open the Street Level panel to view imagery`、`Image could not be opened`、`Street-level viewer was closed`（自 `28e6a1f` / `6207e41` 起就是英文）。
+
+### 刻意不译（逐条追调用链确认）
+
+- `Street Level viewer has no host element` — viewer.js mount 入参守卫：`viewerHost.open()` 已先判 `!state.street.host` 并改设自己的兜底串，`prewarm()` 的 catch 直接吞掉，两处都到不了面板。
+- `Google Street View needs getApiKey` — `createGoogleProvider` 的装配期 TypeError（constructCatalog 抛出，应用起不来），同 2026-10-12 那批构建期守卫的口径。
+- `GOOGLE STREET VIEW` / `Google Street View` / `GOOGLE STREET VIEW ↗` / `MAPILLARY ↗` — 数据源品牌名与链接标签，与既有 `MAPILLARY` 保留原文口径一致。
+
+### 门槛强化
+
+- 新增测试 **`Google 街景数据源动态串必须译出`** — 40 条正向用例 + 6 条不译断言。汉化门槛 26 → **27 例**。
+- **`Light aircraft` 碰撞防护**：`keySetupWithAlternatives` 的 `Light LABEL…` 与飞机分类标签（`aircraftClass.js` 的 `light: 'Light aircraft'`）同为 Light 开头。规则用全大写字符类收窄句式，并加断言锁住「宽规则不得搅进分类标签」——反向验证③实测：把规则改成 `/^Light (.+)$/` 后 `Light aircraft` 立即被误译成「点亮 aircraft」，确证收窄正则必要。
+- 反向验证 3 次全部精确报红：① 改坏 `GOOGLE_MAPS_API_KEY is not set` 词条 → 报红；② `Light` 规则改永不匹配 → 报红；③ 规则改宽 → 正向用例半译报红 + 探针实测 `Light aircraft` 被误伤。每次破坏后先 `node --check` 确认语法有效再跑。
+- 实测数字：词典 **1073 → 1096**（+23）、规则 **212 → 221**（+9）；静态模板覆盖 **413/413**（上轮 412，本轮上游 layer-panels.html 新增 `OPEN STREET VIEW` 按钮 → +1）、JS 内嵌 HTML **101/101**；探针 46 条候选：**39 命中 / 7 刻意不译**。
+- 依赖：`package.json` 只新增 1 条 `exports` 映射（google provider 子路径），`package-lock.json` **未变** → 无需 `npm install`。
+- QA 脚本：`qa-street-level.mjs` 大幅扩充（+329 行，Google 街景 fixture 路径），但其英文 pin（`gev-lang=en` 经 `boot()` 的 `evaluateOnNewDocument`，第 389 行）覆盖所有 `newPage()` 路径（主页面 + keyless 第二页面都走 `boot()`），无需补 pin。`qa-gbfs-names.mjs`（新增）只断言 API JSON 字段，不碰 DOM 文案。
+- 新坑记录：**门槛「词典无重复键」的扫描区块从 `var DICT = {` 一直延伸到动态串规则注释**，其键提取正则会认任何「引号对 + 冒号」形态——新增辅助函数若落在该区块内，代码或注释里都不能出现「空字符串紧跟冒号」的写法（本轮 `trAlternatives` 的注释初版就踩中，被当成空键报重复）。
+
 ## zh-1.7.1 — 2026-10-12
 
 **路径规划图层清欠专轮**（zh-1.7.0「已知欠账」清单的第一项）。这批文案自上游 `d78696d`（2026-09-14，#564 无密钥路径规划）引入起就是英文，潜伏近一个月——载体是**第三片盲区**：`directionsRowControls()` 等纯函数只造对象字面量，`chipGroup.js` / `rowList.js` 逐节点 `set(textContent/title)` 赋值，既无 HTML 模板也无反引号标记，静态门槛与内嵌 HTML 门槛都扫不到。

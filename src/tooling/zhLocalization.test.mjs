@@ -1524,3 +1524,110 @@ test('路径规划图层：chips / 步骤指令 / 状态串必须译出（第三
   assert.equal(lookup('Turn left onto Cedar Ridge Road'), '向左转，进入 Cedar Ridge Road');
 });
 
+test('Google 街景数据源动态串必须译出（2026-10-14 上游新增 providers/google/）', () => {
+  const { lookup } = loadPatch();
+  // 用例形态全部实测取得：直接 import 上游模块枚举真实输出
+  //（keySetupWithAlternatives / presentNearest 的 label+title / hintFor /
+  //  unavailableReason / openNearest 的两分支 / policy.js 的三条消息常量），
+  //  再用 references/probe-lookup.mjs 复核期望值，没有凭想象编的串。
+  const cases = [
+    // presentNearest() 的按钮 label：模板占位 OPEN STREET VIEW（hidden 态），
+    // 运行时被 `OPEN ${labels}` 覆盖。label 是全大写品牌名，保留原文只译动词。
+    ['OPEN STREET VIEW', '打开街景'],
+    ['OPEN GOOGLE STREET VIEW', '打开 GOOGLE STREET VIEW'],
+    ['OPEN MAPILLARY / GOOGLE STREET VIEW', '打开 MAPILLARY / GOOGLE STREET VIEW'],
+    // presentNearest() 的 title 两态（groundClickReady 真/假）
+    ['Open Google Street View at the centre of the view', '在视野中心打开 Google Street View'],
+    ['Zoom in to a street to open Google Street View here', '放大到街道即可在此打开 Google Street View'],
+    // hintFor()（index.js）：地面点击数据源在相机太高时替换 coverage hint
+    ['zoom in to a street to open Google Street View', '放大到街道即可打开 Google Street View'],
+    // GROUND_CLICK_HINT（policy.js）→ coverageStats().hint → presentMeta 明细行
+    ['click a street to open Street View', '点击街道即可打开街景'],
+    // presentMeta 三段复合串：第二三段都是本轮/既有欠账的词条，缺一段就半译
+    ['click a line for its photos', '点击线条可查看其照片'],
+    ['2,514 sequences in view · click a line for its photos · click a street to open Street View',
+      '视野内有 2,514 条序列 · 点击线条可查看其照片 · 点击街道即可打开街景'],
+    // openNearest() 瞄准天空（AIM_AT_GROUND_MESSAGE）与找不到影像（两分支）
+    ['Aim the middle of the view at a street to look for imagery there',
+      '请把视野中心对准街道，再查找该处影像'],
+    ['No street-level imagery within 50 m of that point', '该点 50 米范围内没有街景影像'],
+    ['No street-level imagery within 50 m of the view centre', '视野中心 50 米范围内没有街景影像'],
+    // unavailableReason()（index.js）：与既有 Camera follow 那条术语一致（「地图源」）
+    ['Google Street View needs the Google 3D map: choose it under MAP SOURCE',
+      'Google Street View 需要 Google 3D 地图：请在「地图源」中选择'],
+    // google/policy.js 三条消息常量：同一条串渲染在 street.error、chip title、toast 三处
+    ['Google refused GOOGLE_MAPS_API_KEY for Street View — check that the Maps JavaScript API is enabled for it and this site is an allowed referrer',
+      'Google 拒绝了用于街景的 GOOGLE_MAPS_API_KEY — 请确认已为该密钥启用 Maps JavaScript API，且本站在允许的来源列表中'],
+    ['Street View did not answer — check the network, and that the Maps JavaScript API is enabled for GOOGLE_MAPS_API_KEY',
+      '街景无响应 — 请检查网络，并确认已为 GOOGLE_MAPS_API_KEY 启用 Maps JavaScript API'],
+    // mapsLoader.js / viewer.js 的 reject：经 viewerHost.open() 的 catch 写进 street.error
+    ['GOOGLE_MAPS_API_KEY is not set', '未设置 GOOGLE_MAPS_API_KEY'],
+    ['The Google Maps JavaScript API could not load', 'Google Maps JavaScript API 加载失败'],
+    ['Street View has no imagery for this place', '该地点没有街景影像'],
+    ['Street View was unmounted', '街景查看器已被卸载'],
+    ['Street View is not mounted', '街景查看器尚未挂载'],
+    // presentProviders() 的 chip title：`${name}: ${原因}` 与 `${name} imagery on|off`
+    ['Google Street View: Google refused GOOGLE_MAPS_API_KEY for Street View — check that the Maps JavaScript API is enabled for it and this site is an allowed referrer',
+      'Google Street View: Google 拒绝了用于街景的 GOOGLE_MAPS_API_KEY — 请确认已为该密钥启用 Maps JavaScript API，且本站在允许的来源列表中'],
+    ['Google Street View: Needs GOOGLE_MAPS_API_KEY — add it in Provider Settings',
+      'Google Street View: 需要 GOOGLE_MAPS_API_KEY — 请在「数据源配置」中添加'],
+    ['Google Street View imagery on', 'Google Street View 影像已开启'],
+    ['Google Street View imagery off', 'Google Street View 影像已关闭'],
+    // keySetupWithAlternatives()（本轮上游新增）：requirement + offer，可叠加多个
+    ['Needs GOOGLE_MAPS_API_KEY — add it in Provider Settings, or light MAPILLARY to use your Mapillary key',
+      '需要 GOOGLE_MAPS_API_KEY — 请在「数据源配置」中添加，或点亮 MAPILLARY 以使用你的 Mapillary 密钥'],
+    ['Needs GOOGLE_MAPS_API_KEY — add it in Provider Settings, or light MAPILLARY to use your Mapillary key, or light OPENSKY to use your Opensky key',
+      '需要 GOOGLE_MAPS_API_KEY — 请在「数据源配置」中添加，或点亮 MAPILLARY 以使用你的 Mapillary 密钥，或点亮 OPENSKY 以使用你的 Opensky 密钥'],
+    // requirement 为空时上游把首字母改写成大写
+    ['Light MAPILLARY to use your Mapillary key', '点亮 MAPILLARY 以使用你的 Mapillary 密钥'],
+    // viewerHost.js 三条既有欠账（自 28e6a1f / 6207e41 起就是英文，本轮顺手清）
+    ['Open the Street Level panel to view imagery', '请展开街景面板以查看影像'],
+    ['Image could not be opened', '照片无法打开'],
+    ['Street-level viewer was closed', '街景查看器已关闭'],
+    // keySetupCore.mjs 的 unlocks（keySetup.js 直接 textContent 进 .key-setup-unlocks）。
+    // 本轮 google-maps 那条被上游改文案；其余 8 条是既有欠账，一并补齐。
+    ['The photorealistic 3D planet, place search + Street View', '写实 3D 地球、地点搜索 + 街景'],
+    ['Places context + Street View fallback; optional separate key', '地点上下文 + 街景兜底；可选的独立密钥'],
+    ['Voice control — API key or ChatGPT OAuth', '语音控制 — API 密钥或 ChatGPT OAuth'],
+    ['Live ships, worldwide', '全球实时船舶'],
+    ['Live active-fire detections', '实时活跃火点探测'],
+    ['Real live traffic (keyless runs a simulation)', '真实实时路况（免密钥时运行模拟）'],
+    ['More flight-polling credits (anonymous works without)', '更多航班轮询额度（匿名也可用）'],
+    ['Street-level imagery and coverage in the Street Level layer. Free: register an app in the Mapillary developer dashboard and paste its Client Token',
+      '街景图层中的街景影像与覆盖范围。免费：在 Mapillary 开发者后台注册一个应用，并粘贴其 Client Token'],
+    ['Higher space-missions request allowance', '更高的太空任务请求额度'],
+    ['Bing imagery map stacks + world terrain', 'Bing 影像地图栈 + 全球地形'],
+  ];
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) {
+      failures.push(
+        `${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`,
+      );
+    }
+  }
+  assert.deepEqual(failures, [], `Google 街景动态串回归：\n  ${failures.join('\n  ')}`);
+
+  // 反向对照（防「词典整体失灵」假绿）：相邻真实文案确实译出
+  assert.equal(lookup('STREET LEVEL'), '街景');
+  // 刻意不译清单（逐条追调用链确认无 UI 渲染路径，或纯专有名词）：
+  //   ① viewer.js mount 的入参守卫：viewerHost.open() 已先判 !state.street.host
+  //      并改设自己的兜底串，prewarm() 的 catch 直接吞掉 → 两处都到不了面板
+  //   ② createGoogleProvider 的 TypeError：在 constructCatalog 装配期抛出，
+  //      应用根本没起来（同 2026-10-12 那批构建期守卫）
+  //   ③ 数据源品牌名与其链接标签（`${providerLabel} ↗`）
+  assert.equal(lookup('Street Level viewer has no host element'), null,
+    '内部入参守卫被误译（它不经 street.error 渲染）');
+  assert.equal(lookup('Google Street View needs getApiKey'), null,
+    '装配期 TypeError 被误译（应用起不来，不是界面文案）');
+  assert.equal(lookup('Google Street View'), null, '数据源品牌名被误译');
+  assert.equal(lookup('GOOGLE STREET VIEW'), null, '数据源 chip label 被误译');
+  assert.equal(lookup('GOOGLE STREET VIEW ↗'), null, '品牌名链接标签被误译');
+  // 飞机分类标签（src/data/aircraftClass.js 的 light: 'Light aircraft'）与
+  // keySetupWithAlternatives 的 `Light LABEL…` 同为 Light 开头：
+  // 规则用全大写字符类收窄句式，这条断言锁住「宽规则不得搅进分类标签」。
+  assert.equal(lookup('Light aircraft'), null,
+    'Light aircraft（飞机分类标签）被 /Light/ 规则误伤');
+});
+
