@@ -937,6 +937,61 @@
     'Image could not be opened': '照片无法打开',
     'Street-level viewer was closed': '街景查看器已关闭',
 
+    // ===== KartaView 街景数据源（2026-10-15 上游新增 providers/kartaview/）=====
+    // 品牌名 KartaView / KARTAVIEW 保留原文，与 Mapillary / Google Street View 口径一致。
+    // 覆盖提示（policy.js 常量 → lineCoverage 的 coverage.hint → presentMeta 明细行）
+    'zoom in to see KartaView coverage': '放大即可查看 KartaView 覆盖',
+    'no KartaView photos in view': '视野内无 KartaView 照片',
+    'Point the camera at the globe for street-level coverage': '把相机对准地球以查看街景覆盖',
+    // 点击提示（LINE_CLICK_HINT → presentMeta 复合串第二段；coverageLabel.noun 走规则）
+    'click a line for its nearest photo': '点击线条可查看最近的照片',
+    // 覆盖错误（lineCoverage 的 lastError → coverageStats().error → 面板错误行）
+    'Coverage tile failed': '覆盖瓦片加载失败',
+    'KartaView sent an unreadable coverage tile': 'KartaView 发回了无法解读的覆盖瓦片',
+    'KartaView did not filter this area in time — move the map to ask again':
+      'KartaView 未能及时过滤该区域 — 移动地图可重新请求',
+    // 限流三形态：覆盖 429 独立串（也作 `/^(.+) — try again in a moment$/` 规则的前缀
+    // 捕获段，必须能独立查到）、policy 常驻提示；复合形态靠前缀 + 既有规则译出
+    'KartaView is rate-limiting requests': 'KartaView 正在限流',
+    'KartaView is rate-limiting requests — they resume on their own':
+      'KartaView 正在限流 — 请求会自行恢复',
+    // 照片 API 错误（source.js → nearestImage/getPhoto → street.error / toast）
+    'KartaView did not answer in time — try again': 'KartaView 未及时响应 — 请重试',
+    'KartaView could not be reached — check the network': '无法连接 KartaView — 请检查网络',
+    'KartaView sent an answer that could not be read': 'KartaView 返回了无法读取的应答',
+    'KartaView sent too much data': 'KartaView 返回的数据过大',
+    'KartaView has no such photo': 'KartaView 没有该照片',
+    'KartaView has no position for this photo': 'KartaView 的该照片没有位置信息',
+    // openNearest 找不到可展示照片的两种结局（nearestImage throw → street.error）
+    'KartaView’s photos here are archived and cannot be shown':
+      'KartaView 在此处的照片已归档，无法显示',
+    'None of KartaView’s photos here pass the imagery filter':
+      'KartaView 在此处的照片均未通过影像过滤',
+    // viewer.js：onReopen 失败 toast、open() 竞态（同 Google viewer 的 street.error 路径）
+    'The KartaView photo could not be loaded': 'KartaView 照片无法加载',
+    'KartaView viewer is not mounted': 'KartaView 查看器尚未挂载',
+    // viewer.js 的 img alt 与根 aria-label、序列步进按钮的 title/aria-label
+    'KartaView street-level photo': 'KartaView 街景照片',
+    'KartaView photo. ← and → step along the sequence. On a 360° photo, drag or use Shift+← →, ↑ ↓ to look around, and + − to zoom':
+      'KartaView 照片。← 和 → 沿序列切换。360° 照片上可拖拽或用 Shift+← →、↑ ↓ 环视，+ − 缩放',
+    'Previous photo in this sequence (←)': '本序列上一张照片 (←)',
+    'Next photo in this sequence (→)': '本序列下一张照片 (→)',
+    // sequenceCones.js：序列加载失败 reportError → toast
+    'Sequence images unavailable': '序列照片不可用',
+    // imagery.js：Ion 端点异常 → controller._onError → 错误提示（ion 源无 constructionFallback）
+    'Ion world imagery did not return a Bing imagery endpoint':
+      'Ion 全球影像未返回 Bing 影像端点',
+    // 刻意不译（逐条追调用链确认无 UI 渲染路径或是数据字段）：
+    //   'Street Level viewer has no host element'（kartaview viewer.js mount 入参守卫——
+    //     viewerHost.open()/prewarm() 已先判 state.street.host，同 Google viewer 轮结论）
+    //   'WebGL is unavailable' / 'Panorama program failed to link'（panorama.js，
+    //     viewer.js 建渲染器处 catch 吞掉并置 rendererFailed 走 2D 兜底，到不了面板）
+    //   CCTV NYC 批（'Staten Island'/'New York'/'NYC DOT Traffic Management Center'/
+    //     'Public NYC DOT…'/'NYC Camera'）：城市/服务商/许可/兜底名全是数据字段，
+    //     与 Calgary/Fintraffic 等既有摄像头数据不译的口径一致
+    //   dataCredits.js 的 NYC_DOT_DISCLAIMER 与 nyc-cctv html：署名法律文本，
+    //     既有 28+ 条 credits 条目均未译，口径一致
+
     // ===== 密钥设置面板：各密钥「可解锁什么」（keySetupCore.mjs 的 unlocks）=====
     // src/keySetup.js 把 unlocks 直接 textContent 进 .key-setup-unlocks 段落。
     // 上游本轮把 google-maps 那条改成了含 Street View 的新文案；其余 8 条是既有欠账
@@ -1677,6 +1732,16 @@
     [/^LAST ([\d,]+) DAYS$/, function (m) { return '近 ' + m[1] + ' 天'; }],
     // 街景图像右上角读数由 ' · ' 拼接（`360° · 128° · 2026-09-01`），
     // 全是数据段，translateSegments 会保留原文，无需规则。
+
+    // ===== KartaView 街景数据源的动态串（2026-10-15 上游新增 providers/kartaview/）=====
+    // presentMeta 复合串首段：`${count} ${noun} in view`（kartaview 的
+    // coverageLabel.noun = 'streets'，区别于 Mapillary 默认的 'sequences'）。
+    [/^([\d,]+) streets in view$/, function (m) { return '视野内有 ' + m[1] + ' 条街道'; }],
+    // sinceNote（uiState.js）：`${names.join(', ')}: by upload date`，
+    // names 是 provider 名（专有名词保留原文），单/多数据源同一条规则。
+    [/^(.+): by upload date$/, function (m) { return m[1] + '：按上传日期'; }],
+    // source.js：`KartaView answered HTTP ${status}`（非 429 的非 2xx → street.error）
+    [/^KartaView answered HTTP (\d+)$/, function (m) { return 'KartaView 返回 HTTP ' + m[1]; }],
 
     // ===== 语音助手卡片动态串（src/voice/speech.js、voiceCardPresentation.js）=====
     // 只覆盖**显示串**（display.title / lines / notes / planStepLabel / progressStepLabel）。

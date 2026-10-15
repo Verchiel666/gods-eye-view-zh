@@ -1631,3 +1631,95 @@ test('Google 街景数据源动态串必须译出（2026-10-14 上游新增 prov
     'Light aircraft（飞机分类标签）被 /Light/ 规则误伤');
 });
 
+test('KartaView 街景数据源动态串必须译出（2026-10-15 上游新增 providers/kartaview/）', () => {
+  const { lookup } = loadPatch();
+  // 用例形态全部实测取得：policy.js 消息常量 / source.js 错误常量与 HTTP 形态 /
+  //  viewer.js 的 alt、aria-label、按钮 title / lineCoverage 的 hint 与 lastError /
+  //  sequenceCones 的 toast / uiState 的 sinceNote / presentMeta 复合串，
+  //  再用 references/probe-lookup.mjs 复核期望值，没有凭想象编的串。
+  const cases = [
+    // 覆盖提示（policy.js → lineCoverage 的 coverage.hint → presentMeta 明细行）
+    ['zoom in to see KartaView coverage', '放大即可查看 KartaView 覆盖'],
+    ['no KartaView photos in view', '视野内无 KartaView 照片'],
+    ['Point the camera at the globe for street-level coverage', '把相机对准地球以查看街景覆盖'],
+    // 覆盖错误（lineCoverage 的 lastError → coverageStats().error → 面板错误行）
+    ['Coverage tile failed', '覆盖瓦片加载失败'],
+    ['KartaView sent an unreadable coverage tile', 'KartaView 发回了无法解读的覆盖瓦片'],
+    ['KartaView did not filter this area in time — move the map to ask again',
+      'KartaView 未能及时过滤该区域 — 移动地图可重新请求'],
+    // 限流三形态：独立串 / policy 常驻提示 / 429 复合（既有 em-dash 规则接住，前缀取词条）
+    ['KartaView is rate-limiting requests', 'KartaView 正在限流'],
+    ['KartaView is rate-limiting requests — they resume on their own',
+      'KartaView 正在限流 — 请求会自行恢复'],
+    ['KartaView is rate-limiting requests — try again in a moment',
+      'KartaView 正在限流 — 请稍后再试'],
+    // 照片 API 错误（source.js → nearestImage/getPhoto → street.error / toast）
+    ['KartaView did not answer in time — try again', 'KartaView 未及时响应 — 请重试'],
+    ['KartaView could not be reached — check the network', '无法连接 KartaView — 请检查网络'],
+    ['KartaView sent an answer that could not be read', 'KartaView 返回了无法读取的应答'],
+    ['KartaView sent too much data', 'KartaView 返回的数据过大'],
+    ['KartaView has no such photo', 'KartaView 没有该照片'],
+    ['KartaView has no position for this photo', 'KartaView 的该照片没有位置信息'],
+    ['KartaView answered HTTP 503', 'KartaView 返回 HTTP 503'],
+    // openNearest 找不到可展示照片的两种结局（nearestImage throw → street.error）
+    ['KartaView’s photos here are archived and cannot be shown',
+      'KartaView 在此处的照片已归档，无法显示'],
+    ['None of KartaView’s photos here pass the imagery filter',
+      'KartaView 在此处的照片均未通过影像过滤'],
+    // viewer.js：onReopen 失败 toast、open() 竞态、alt / aria-label / 按钮 title
+    ['The KartaView photo could not be loaded', 'KartaView 照片无法加载'],
+    ['KartaView viewer is not mounted', 'KartaView 查看器尚未挂载'],
+    ['KartaView street-level photo', 'KartaView 街景照片'],
+    ['KartaView photo. ← and → step along the sequence. On a 360° photo, drag or use Shift+← →, ↑ ↓ to look around, and + − to zoom',
+      'KartaView 照片。← 和 → 沿序列切换。360° 照片上可拖拽或用 Shift+← →、↑ ↓ 环视，+ − 缩放'],
+    ['Previous photo in this sequence (←)', '本序列上一张照片 (←)'],
+    ['Next photo in this sequence (→)', '本序列下一张照片 (→)'],
+    // sequenceCones.js：序列加载失败 reportError → toast
+    ['Sequence images unavailable', '序列照片不可用'],
+    // imagery.js：Ion 端点异常 → controller._onError → 错误提示
+    ['Ion world imagery did not return a Bing imagery endpoint', 'Ion 全球影像未返回 Bing 影像端点'],
+    // sinceNote（uiState.js）：单/多数据源两形态，provider 名保留原文
+    ['KartaView: by upload date', 'KartaView：按上传日期'],
+    ['KartaView, Mapillary: by upload date', 'KartaView, Mapillary：按上传日期'],
+    // presentMeta 复合串：kartaview 的 noun='streets'、action=LINE_CLICK_HINT，
+    // 三段全译才不算半译；单段与复合都锁住
+    ['click a line for its nearest photo', '点击线条可查看最近的照片'],
+    ['3 streets in view', '视野内有 3 条街道'],
+    ['12,400 streets in view', '视野内有 12,400 条街道'],
+    ['3 streets in view · click a line for its nearest photo',
+      '视野内有 3 条街道 · 点击线条可查看最近的照片'],
+    ['47 streets in view · click a line for its nearest photo · zoom in to see KartaView coverage',
+      '视野内有 47 条街道 · 点击线条可查看最近的照片 · 放大即可查看 KartaView 覆盖'],
+    // presentNearest() 的按钮 label：`OPEN ${labels}` 既有规则覆盖新品牌
+    ['OPEN KARTAVIEW', '打开 KARTAVIEW'],
+  ];
+  const failures = [];
+  for (const [input, expected] of cases) {
+    const got = lookup(input);
+    if (got !== expected) {
+      failures.push(
+        `${JSON.stringify(input)}\n      期望: ${JSON.stringify(expected)}\n      实际: ${JSON.stringify(got)}`,
+      );
+    }
+  }
+  assert.deepEqual(failures, [], `KartaView 街景动态串回归：\n  ${failures.join('\n  ')}`);
+
+  // 反向对照（防「词典整体失灵」假绿）：相邻真实文案确实译出
+  assert.equal(lookup('click a line for its photos'), '点击线条可查看其照片');
+  // 刻意不译清单（逐条追调用链确认无 UI 渲染路径，或纯专有名词/数据字段）：
+  //   ① panorama.js 的两条：viewer.js 建渲染器处 catch 吞掉并置 rendererFailed
+  //      走 2D 兜底 → 到不了面板（'Street Level viewer has no host element'
+  //      的不译断言已在 Google 测试里，同串同理，不重复）
+  //   ② 数据源品牌名（name / chip label）
+  //   ③ CCTV NYC 批：城市/服务商/许可/兜底名全是数据字段
+  assert.equal(lookup('WebGL is unavailable'), null,
+    'panorama 建渲染器错误被误译（它被 catch 吞掉走 2D 兜底）');
+  assert.equal(lookup('Panorama program failed to link'), null,
+    'panorama 链接错误被误译（同上路径）');
+  assert.equal(lookup('KartaView'), null, '数据源品牌名被误译');
+  assert.equal(lookup('KARTAVIEW'), null, '数据源 chip label 被误译');
+  assert.equal(lookup('NYC Camera'), null, 'CCTV 摄像头兜底名（数据字段）被误译');
+  assert.equal(lookup('NYC DOT Traffic Management Center'), null,
+    'CCTV 服务商名（数据字段）被误译');
+});
+

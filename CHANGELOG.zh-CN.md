@@ -2,6 +2,34 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.9.0 — 2026-10-15
+
+**同步上游 KartaView 街景数据源**（`providers/kartaview/`，98 个上游提交，106 文件 +11089/-1389）。上游为街景图层接入第二个免密钥数据源 KartaView：新 provider 全套（source/policy/decode/panorama/viewer）、线覆盖 `lineCoverage.js`、序列锥体 `sequenceCones.js`、SINCE 滑块下的 `sinceNote` 标注、NYC DOT 摄像头源（服务端）、Ion→Bing 影像直连。静态门槛首跑全绿（上游只往模板加了一个空的 `<small id="sl-since-note">` 占位）；diff 串扫描 + vm 探针实测出 **33 条未译动态串**，全部补齐。用例形态全部从上游源码**实测**取得（policy/source 消息常量、viewer 的 alt/aria-label、presentMeta 复合拼接点），再经 `probe-lookup.mjs` 复核。
+
+### 新增
+
+- **policy.js 覆盖提示与消息 7 条** — `zoom in to see KartaView coverage`、`no KartaView photos in view`、`Point the camera at the globe…`（hint 三态，经 `coverageStats().hint` → presentMeta 明细行）；限流常驻提示、归档/过滤两种 `nearestImage` 结局（throw → `street.error`）。
+- **source.js 照片 API 错误 7 条** — 超时/断网/不可读/数据过大/无此照片/无位置/限流，经 `street.error` 明细行与 toast 渲染；`KartaView answered HTTP ${status}` 走新规则。
+- **限流三形态的拆译** — 覆盖 429 独立串 `KartaView is rate-limiting requests`（它同时是既有 `/^(.+) — try again in a moment$/` 规则的前缀捕获段，必须能独立查到，否则复合串整条放弃）、policy 常驻提示整串词条、照片 API 429 复合靠前缀 + 既有规则译出。
+- **viewer.js 6 条** — onReopen 失败 toast、open() 竞态（同 Google viewer 的 `street.error` 路径）、img `alt`、根 `aria-label`（含 ← → ↑ ↓ ° − 特殊字符，字节级核对后收录）、序列步进按钮 `title`/`aria-label` 两条。
+- **presentMeta 复合串** — kartaview 的 `coverageLabel = {noun: 'streets', action: 'click a line for its nearest photo'}`：新增 `/^([\d,]+) streets in view$/` 规则（区别于 Mapillary 默认的 `sequences`），action 整串词条；单段、两段、三段复合形态全部锁进门槛。
+- **`sinceNote`（本轮上游新增 UI 元素）** — `uiState.js` 拼 `${names.join(', ')}: by upload date`，单/多数据源两形态同一条规则（provider 名保留原文）；模板里新增的 `<small id="sl-since-note">` 初始为空，不占静态覆盖条数。
+- **sequenceCones / lineCoverage / imagery 各 1 条** — `Sequence images unavailable`（toast）、`Coverage tile failed`（lastError 兜底）、`Ion world imagery did not return a Bing imagery endpoint`（ion 源无 `constructionFallback`，错误经 `controller._onError` 直达错误提示）。
+
+### 刻意不译（逐条追调用链确认）
+
+- `Street Level viewer has no host element` — kartaview viewer.js mount 入参守卫：`viewerHost.open()`/`prewarm()` 已先判 `state.street.host`，同 Google viewer 轮结论（该断言已在 Google 测试里，不重复）。
+- `WebGL is unavailable` / `Panorama program failed to link` — panorama.js 建渲染器失败被 viewer.js 的 catch 吞掉并置 `rendererFailed` 走 2D 兜底，到不了面板。
+- CCTV NYC 批（`Staten Island`/`New York`/`NYC DOT Traffic Management Center`/`Public NYC DOT…`/`NYC Camera`）— 城市/服务商/许可/兜底名全是数据字段，与 Calgary/Fintraffic 等既有摄像头数据不译的口径一致。
+- `dataCredits.js` 的 `NYC_DOT_DISCLAIMER` 与 nyc-cctv html — 署名法律文本，既有 28+ 条 credits 条目均未译，口径一致。
+
+### 验证
+
+- 汉化门槛 **28/28**（新增 KartaView 测试：36 正向用例 + 6 不译断言）；探针 36 条 = 33 命中 / 3 刻意不译
+- 反向验证 3 次全部精确报红（破坏词条 / streets 规则改永不匹配露出半译形态 / 给 panorama 串加词条触发不译断言），每次先 `node --check` 确认破坏生效
+- `npm test` **6560 / 6550 pass / 0 fail / 10 skip**（上游本轮修复了 `codexOauthRealtime.test.mjs` 的 win32 路径断言，此前恒有的 1 个平台缺陷 fail 已消失）；`npm run build` ✓（26.77s）；`check:boundaries` ✓；`format:check` ✓（1340 文件）
+- 词典 1096 → **1121**、规则 221 → **224**、门槛 27 → **28 例**
+
 ## zh-1.8.0 — 2026-10-14
 
 **同步上游 Google 街景数据源**（`providers/google/`，18 个上游提交，62 文件 +4547/-177）。上游为街景图层接入 Google Street View：新 provider 全套（mapsLoader/viewer/policy/groundClick）、`OPEN STREET VIEW` 键盘入口按钮、`keySetupWithAlternatives()` 密钥替代引导、`unlocks` 文案更新。
