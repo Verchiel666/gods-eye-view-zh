@@ -284,6 +284,13 @@
     'Label for the drawn shape': '所绘形状的标签',
     'Colour of the drawn shape': '所绘形状的颜色',
 
+    // ===== 文件导入（src/ui/templates/display-controls.html #geo-import-group）=====
+    // 2026-10-16 合并上游新增：GeoJSON/KML/KMZ/GPX 导入按钮、文件选择与已导入列表
+    'Show your own GeoJSON, KML, KMZ or GPX files on the globe (or drop them onto it). File bytes stay on this device; overlays can appear in map screenshots shared with voice.':
+      '在地球上显示你自己的 GeoJSON、KML、KMZ 或 GPX 文件（也可以直接拖放到地球上）。文件内容只留在本机；叠加层可能出现在通过语音分享的地图截图中。',
+    'Choose GeoJSON, KML, KMZ or GPX files': '选择 GeoJSON、KML、KMZ 或 GPX 文件',
+    'Imported files': '已导入的文件',
+
     // ===== 驾驶舱气象简报（src/data/regionalModel.js weatherCodeLabel）=====
     // 全大写：与手绘面板的 'Clear' / 'Snow' 区分开，二者语义不同
     'CLEAR': '晴', 'PARTLY CLOUDY': '局部多云', 'OVERCAST': '阴', 'FOG': '雾',
