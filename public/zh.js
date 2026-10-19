@@ -1,6 +1,8 @@
 /* God's Eye View 汉化补丁（运行时注入，不改核心源码）
- * 启用：index.html 引入本脚本 + localStorage['gev-lang']='zh'
- * 切换：界面右上角「中/EN」按钮（切换后自动刷新）
+ * 启用：index.html 引入本脚本；语言环境为中文时自动生效
+ * （2026-10-19 起跟随上游原生 i18n 的解析：?lang= → gev:locale:v1 → 浏览器语言 → 默认 zh）
+ * 切换：界面右下角地球按钮（上游 locale 选择器，切换后自动刷新）
+ * 分工：UI 文案由上游原生 zh.json 目录接管；本补丁只补数据动态串与弹窗 hook
  *
  * zh-1.1.0 变更（同步上游 255 提交大重构后补充）：
  *   - 词典扩充至 ~330 条，覆盖 src/ui/ 组件化重构后的新面板
@@ -12,7 +14,34 @@
 (function () {
   'use strict';
   var LANG = 'zh';
-  try { if ((localStorage.getItem('gev-lang') || LANG) !== 'zh') return; } catch (e) { return; }
+  // 语言门禁（2026-10-19 起跟随上游原生 i18n，解析顺序与 resolveLocale 一致）：
+  // ?lang= → localStorage['gev:locale:v1'] → 浏览器语言 → 默认 zh。
+  // 旧键 gev-lang 一次性迁移进新键后删除。解析结果非 zh 时补丁整体让位：
+  // 上游目录（es/ru/zh）已接管 UI 文案，本补丁只补数据动态串。
+  try {
+    var legacy = localStorage.getItem('gev-lang');
+    if (legacy) {
+      try {
+        if (!localStorage.getItem('gev:locale:v1')) {
+          localStorage.setItem('gev:locale:v1', legacy === 'en' ? 'en' : 'zh');
+        }
+        localStorage.removeItem('gev-lang');
+      } catch (e2) {}
+    }
+    var qm = /[?&]lang=([^&#]*)/.exec(
+      (typeof location !== 'undefined' && location.search) || '',
+    );
+    var ql = qm ? qm[1] : null;
+    var stored = localStorage.getItem('gev:locale:v1');
+    var navs =
+      (typeof navigator !== 'undefined' &&
+        (navigator.languages || [navigator.language])) ||
+      [];
+    var eff = (ql || stored || navs[0] || 'en').toLowerCase().split(/[-_]/)[0];
+    if (eff !== 'zh') return;
+  } catch (e) {
+    return;
+  }
 
   /* ---------- 词典（键为英文原文，trim 后精确匹配，大小写多形态回退） ---------- */
   var DICT = {
@@ -135,12 +164,12 @@
     'ENABLE GLOBAL CONTEXT FOR PROXIMITY PINGS': '启用全球情报以接收周边信号',
     'CONTEXT ONLY': '仅情报', 'CONTEXT STANDBY': '情报待命', 'SELECT CONTEXT': '选择情报',
     'AHEAD': '前方',
-    'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR': '目标丢失 · 最后一次已知读数 · 非全面许可',
+    'CONTACT LOST · LAST KNOWN READOUT · NOT AN ALL-CLEAR': '目标丢失 · 最后一次已知读数 · 并非解除警报',
     'POSITION UNAVAILABLE': '位置不可用', 'REGION UNAVAILABLE': '区域不可用',
 
     // ===== HUD 抬头显示 =====
     'TOP SECRET // SI-TK // NOFORN': '绝密 // SI-TK // 禁止外传',
-    'AVAILABLE INPUTS ONLY · NOT AN ALL-CLEAR': '仅含可用输入 · 非全面许可',
+    'AVAILABLE INPUTS ONLY · NOT AN ALL-CLEAR': '仅含可用输入 · 并非解除警报',
     'SUMMARY': '摘要', 'LOCAL': '本地', 'LOCAL INFO': '本地信息',
     'LIVE SIGNALS': '实时信号', 'LIVE TRACK': '实时轨迹',
     'LIVE TRACK · COURSE ALIGNED': '实时轨迹 · 航向对齐',
@@ -2238,16 +2267,8 @@
     // 兜底：Cesium 覆盖层等 canvas 外动态 DOM 周期补扫（仅未处理节点）
     setInterval(function () { walk(document.body); }, 4000);
 
-    // 语言切换按钮
-    var btn = document.createElement('button');
-    btn.textContent = '中 / EN';
-    btn.title = '切换界面语言';
-    btn.style.cssText = 'position:fixed;top:10px;right:12px;z-index:99999;background:#10161d;color:#4dd8e6;border:1px solid #2a8a94;border-radius:6px;padding:6px 12px;font:12px Consolas,monospace;cursor:pointer;letter-spacing:1px;';
-    btn.onclick = function () {
-      try { localStorage.setItem('gev-lang', 'en'); } catch (e) {}
-      location.reload();
-    };
-    (document.body || document.documentElement).appendChild(btn);
+    // 语言切换已由上游原生 locale 选择器（右下角地球按钮）接管，
+    // 旧的「中 / EN」注入按钮于 2026-10-19 移除。
   }
 
   hookDialogs();   // 尽早 hook，避免 boot 之前已有弹窗调用

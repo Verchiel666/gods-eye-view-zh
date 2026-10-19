@@ -4,17 +4,21 @@
 /** Durable preference key. Matches the repo convention gev:<name>:v1. */
 export const LOCALE_STORAGE_KEY = 'gev:locale:v1';
 
-/** Source language and fallback. */
+/** Source language and fallback. Stays 'en' on the Chinese fork too:
+ * Chinese users resolve to zh through navigator.languages (or the picker);
+ * keeping the source language as fallback preserves upstream test semantics
+ * (unit tests assert English UI text with no browser language present). */
 export const DEFAULT_LOCALE = 'en';
 
 /** Shipped locales; order does not matter. Adding one: docs/TRANSLATORS.md. */
-export const LOCALES = Object.freeze(['en', 'es', 'ru']);
+export const LOCALES = Object.freeze(['en', 'es', 'ru', 'zh']);
 
 /** Each locale named in its own language, for the selector. */
 export const LOCALE_NAMES = Object.freeze({
   en: 'English',
   es: 'Español',
   ru: 'Русский',
+  zh: '中文',
 });
 
 /** Right-to-left locales. */

@@ -2,6 +2,26 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-2.0.0 — 2026-10-19
+
+**切换为上游原生中文语言包**。汉化机制从「DOM 注入补丁」升级为「一等公民 locale」：新增 `src/i18n/locales/zh.json`（**2623 条，覆盖上游全部 `t()`/`tn()`/`msg()` 与 `data-i18n*` 标记**，官方 `npm run i18n` 判定 `zh: 2623 messages, complete`），接入 `LOCALES` 与语言选择器（界面右下角地球按钮，中文名「中文」）。`same-as-english.json` 新增 zh 段 23 条（单位符号、波段、品牌、坐标、调色板名）。`zh.js` 补丁保留但重新分工：只补上游不标记的数据动态串与原生弹窗 hook；其语言门禁改为跟随上游解析顺序（`?lang=` → `gev:locale:v1` → 浏览器语言 → 默认 en），旧键 `gev-lang` 一次性迁移进 `gev:locale:v1`，原「中 / EN」注入按钮移除（由上游选择器接管）。
+
+### 关键设计
+
+- **默认语言保持 en 的解析语义**：中文用户经 `navigator.languages` 自动得到中文（浏览器实测：本机无参启动 `<html lang>=zh` 且界面中文），非中文环境回退英文——上游单测全部暗含英文文案假设，改默认值会让套件系统性变红，浏览器语言检测已能覆盖目标用户。
+- **`tn()` 复数回退修正（index.js 一行）**：回退形态的复数判定改走源语言 `'en'` 而非 `DEFAULT_LOCALE`——否则任何默认语言为 zh 的 fork 都会把英文单数也判成 `other` 形态。这行对上游也是语义修正，可回馈。
+- **context 键原生消歧**：`t('CLEAR', { context: 'action' })` → 清除、`t('CLEAR')` → 晴，取代补丁的 DOM 容器消歧 hack；导航方向词分三套 context（direction 向X转 / fork direction 靠X / lane direction X侧），44 种机动组合经 `directionsInstruction()` 实测枚举验证。
+- **术语修正**：NOT AN ALL-CLEAR 由「非全面许可」改译「并非解除警报」（词典与目录同步）。
+
+### 验证
+
+- `npm run i18n`：zh / es / ru 三语言 **complete**；上游 i18n 测试 **110/110**
+- 汉化门槛 **28/28**（补丁作为数据串层全量保留）；`npm test` **7804 / 7794 pass / 0 fail / 10 skip**
+- `npm run build` ✓（15.79s）；`check:boundaries` ✓（`package-boundaries.json` 按 es/ru 既有模式登记 zh.json 43 处）；`format:check` ✓（1426 文件）
+- 浏览器实测（puppeteer + dist）：默认启动 `lang=zh` 界面中文、`?lang=en` 英文、`?lang=ru` 俄文
+- localePicker 测试夹具按第四个语言更新（排序断言 + End 键落点）
+- 目录构建管线可重跑：`.workbuddy/i18n-migration/`（build-seed → translations 10 碎片 → merge-catalog 终验 missing 0 / stale 0 / errors 0），同步自动化后续按 Stage 4 走 `npm run i18n` 增量
+
 ## zh-1.9.1 — 2026-10-19
 
 **同步上游原生 i18n 设施**（267 个上游提交，558 文件 +40015/-9721）。上游本轮是架构级变更：新增 `src/i18n/` 国际化设施（`t()`/`tn()`/`msg()` 标记函数、es/ru 语言目录、locale 选择器、`scripts/i18n.mjs` 目录同步脚本、`docs/I18N.md`），并把语音卡片、太空任务面板、军事情报面板、洪水事件面板等模块模板里的原始字面量全部包进 `t()` 调用（如 `>${t('AI AGENT')}<`）。**对运行时注入式补丁的影响**：`t()` 在无 zh 目录时返回英文，DOM 仍是英文 → MutationObserver 补丁照常翻译，26 道动态串门槛测试全绿可证覆盖率未退化。

@@ -133,5 +133,30 @@
     "REC",
     "VS",
     "WHOT/BHOT"
+  ],
+  "zh": [
+    "AIS: {name}",
+    "▲ {frp} MW",
+    "28.2710° N · 85.5150° E",
+    "1090 MHz",
+    "978 MHz UAT",
+    "Sentinel-2",
+    "Landsat 8/9",
+    "GOOGLE STREET VIEW",
+    "VS",
+    "Ironbow",
+    "km/h",
+    "m/s",
+    "mph",
+    "hPa",
+    "kt",
+    "kts",
+    "ft",
+    "km",
+    "m",
+    "h",
+    "min",
+    "s",
+    "dB"
   ]
 }

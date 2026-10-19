@@ -18,8 +18,9 @@ import {
 } from './locale.js';
 import es from './locales/es.json' with { type: 'json' };
 import ru from './locales/ru.json' with { type: 'json' };
+import zh from './locales/zh.json' with { type: 'json' };
 
-const CATALOGS = Object.freeze({ es, ru });
+const CATALOGS = Object.freeze({ es, ru, zh });
 
 let currentLocale = DEFAULT_LOCALE;
 
@@ -111,7 +112,10 @@ export function tn(count, one, other, values) {
   if (forms && (filled(forms[category]) || filled(forms.other))) {
     pattern = filled(forms[category]) ? forms[category] : forms.other;
   } else {
-    pattern = pluralRules(DEFAULT_LOCALE).select(count) === 'one' ? one : other;
+    // Plural fallback must follow the source language of the one/other
+    // arguments (English), not DEFAULT_LOCALE — a fork may default to a
+    // locale like zh whose PluralRules have no "one" category.
+    pattern = pluralRules('en').select(count) === 'one' ? one : other;
   }
   return interpolate(pattern, { count, ...values });
 }
