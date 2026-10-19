@@ -177,6 +177,7 @@
     'LOAD COMPLETE': '加载完成', 'LOAD CANCELLED': '加载已取消', 'LOAD FAILED': '加载失败',
     'LOADING 30-DAY MISSION INDEX': '正在加载 30 天任务索引',
     'ACQUIRING REGIONAL NEWS': '正在获取区域新闻', 'ACQUIRING SURFACE': '正在获取地表',
+    'ACQUIRING FRAME': '正在获取画面',
     'ACQUIRING': '获取中', 'RESOLVING REGION': '正在解析区域',
     'ROUTE DATA UNAVAILABLE': '航线数据不可用', 'SOURCE · UNKNOWN': '来源 · 未知',
     'UNKNOWN': '未知', 'READY': '就绪', 'Ready': '就绪',

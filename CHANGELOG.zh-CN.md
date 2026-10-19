@@ -2,6 +2,31 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-1.9.1 — 2026-10-19
+
+**同步上游原生 i18n 设施**（267 个上游提交，558 文件 +40015/-9721）。上游本轮是架构级变更：新增 `src/i18n/` 国际化设施（`t()`/`tn()`/`msg()` 标记函数、es/ru 语言目录、locale 选择器、`scripts/i18n.mjs` 目录同步脚本、`docs/I18N.md`），并把语音卡片、太空任务面板、军事情报面板、洪水事件面板等模块模板里的原始字面量全部包进 `t()` 调用（如 `>${t('AI AGENT')}<`）。**对运行时注入式补丁的影响**：`t()` 在无 zh 目录时返回英文，DOM 仍是英文 → MutationObserver 补丁照常翻译，26 道动态串门槛测试全绿可证覆盖率未退化。
+
+### 新增
+
+- **`ACQUIRING FRAME`**（CCTV 帧加载占位文案，`layer-panels.html` 新增 `data-i18n` 元素）— 「正在获取画面」，与既有 `ACQUIRING SURFACE`/`ACQUIRING REGIONAL NEWS` 口径一致。
+
+### 门槛校准（非覆盖率退化，是测量适配）
+
+- **内嵌 HTML 门槛自检重建**：采集器只认模板里的原始字面量，上游迁移后提取量 101 → **11 条**（全部在 `src/hud.js` 的 HUD 遥测读数，且全部已译）。三道自检相应改为：条数下限 `>60` → `>5`；已知模块 5 个 → `['src/hud.js']`；哨兵只留 `TOP SECRET // SI-TK // NOFORN`（迁移前两外层的活体样本已不存在，三层提取逻辑保留防回退）。反向验证：破坏 `TOP SECRET` 词条 → 精确报红 `src/hud.js`；删 `ACQUIRING FRAME` → 静态门槛精确报红。
+- **依赖漂移硬信号命中**：`package-lock.json` 变更（124+/124-）→ 已 `npm install`。
+
+### ⚠ 新战场（本轮未开垦，建议单开一轮）
+
+- **`t()` 标记串是全量文案的新度量衡**：`scripts/i18n.mjs` 同款提取器实测 src/ 下共 **2315 条** `t()/tn()/msg()` 标记，补丁 lookup 命中 **883**，字面未译 **1432**——但其中含大量 `{placeholder}` 插值串（最终渲染形态多被既有动态规则覆盖，字面 lookup 查不到属预期）与刻意保留的专有名词/数据串。真实缺口需占位符感知的探针逐模块实测，规模远超同步自动化职责。
+- **战略选项**：上游 `src/i18n/locales/` 已支持 es/ru 目录，未来可评估把词典迁移为上游原生 `zh.json` 目录（883+ 已译串可机械转换），从「DOM 注入补丁」转为「原生语言包」——这是项目级决策，本轮维持补丁路线不变。
+
+### 验证
+
+- 汉化门槛 **28/28**；静态覆盖 **418/418**（上游 +1 `ACQUIRING FRAME`）；内嵌 HTML **11/11**
+- `npm test` **7777 / 7767 pass / 0 fail / 10 skip**；`npm run build` ✓（36.27s）；`check:boundaries` ✓
+- 词典 1124 → **1125**（+1）、规则 **224**（不变）、门槛 **28 例**（不变）
+- 附记：zh-1.9.0 之后有一笔未记版本的中间提交 `7c76a00`（2026-10-16，geo-import 文件选择器 3 词条，词典 1121 → 1124），本轮一并并入记录。
+
 ## zh-1.9.0 — 2026-10-15
 
 **同步上游 KartaView 街景数据源**（`providers/kartaview/`，98 个上游提交，106 文件 +11089/-1389）。上游为街景图层接入第二个免密钥数据源 KartaView：新 provider 全套（source/policy/decode/panorama/viewer）、线覆盖 `lineCoverage.js`、序列锥体 `sequenceCones.js`、SINCE 滑块下的 `sinceNote` 标注、NYC DOT 摄像头源（服务端）、Ion→Bing 影像直连。静态门槛首跑全绿（上游只往模板加了一个空的 `<small id="sl-since-note">` 占位）；diff 串扫描 + vm 探针实测出 **33 条未译动态串**，全部补齐。用例形态全部从上游源码**实测**取得（policy/source 消息常量、viewer 的 alt/aria-label、presentMeta 复合拼接点），再经 `probe-lookup.mjs` 复核。

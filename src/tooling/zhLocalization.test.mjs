@@ -350,14 +350,23 @@ test('静态文案 100% 覆盖（同步上游后的覆盖率门槛）', () => {
  * 存在理由见 collectInlineHtmlStrings() 的注释。语音卡片、HUD、太空任务面板、
  * 军事情报面板、洪水事件面板全部走 innerHTML，静态门槛一条也扫不到。
  *
+ * ⚠ 2026-10-19 结构性校准（上游 267 提交合并）：
+ * 上游引入原生 i18n 设施（src/i18n/，t()/tn()/msg() 标记 + es/ru 目录），把语音卡片、
+ * 太空任务面板、军事情报面板、洪水事件面板模板里的原始字面量全部包进 t() 调用，
+ * 例如 `>${t('AI AGENT')}<`。t() 在无 zh 目录时返回英文，DOM 仍是英文 → 运行时补丁照常
+ * 翻译（26 道动态串测试全绿可证）。但本采集器只认模板里的原始字面量，提取量从 101 条
+ * 降到 11 条（全部在 src/hud.js，且全部已译）。自检相应改为以 hud.js 为唯一已知模块；
+ * 三层提取逻辑保留，防上游回退或新增模块再走原始 innerHTML。
+ * t() 标记串本身的覆盖核查是另一片更大的战场（2315 条标记、含 {placeholder} 插值，
+ * 字面 lookup 不可行，需占位符感知的探针），不在本门槛职责内。
+ *
  * 防假绿的三道自检（吸取 2026-09-28「门槛自身失效」与 2026-09-29「虚构断言」两次教训）：
- *   1. 提取条数下限：内嵌文案总量必须 > 60 条。若上游改了注入方式（如换成
- *      createElement + textContent），提取数会骤降 → 下限触发，提示同步更新采集器。
- *   2. 采集器必须真扫到已知的 5 个文件：写死文件名断言，防止「扫不到任何文件
+ *   1. 提取条数下限：内嵌文案总量必须 > 5 条（2026-10-19 前为 > 60，迁移后全量仅 11 条）。
+ *      若 hud.js 也改注入方式，提取数会骤降 → 下限触发，提示同步更新采集器。
+ *   2. 采集器必须真扫到已知模块：写死文件名断言，防止「扫不到任何文件
  *      → 循环体一次都没进 → missing 恒为空 → 门槛假绿」。
- *   3. 三层盲区各留一条已知文案做正向对照：直接 innerHTML 模板（语音卡片）、
- *      变量间接赋值（军事情报面板的开关文案）、插值三元字面量。任一层采集器
- *      退化，对应断言会精确报红，而不是让整道门槛静默变绿。
+ *   3. 留一条已知文案做正向对照（hud.js 的密级横幅）。采集器退化时断言会精确报红，
+ *      而不是让整道门槛静默变绿。
  */
 test('JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区）', () => {
   const { lookup } = loadPatch();
@@ -367,20 +376,14 @@ test('JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区）', ()
   // 自检 1：提取条数下限
   const total = groups.reduce((sum, g) => sum + g.items.length, 0);
   assert.ok(
-    total > 60,
-    `JS 内嵌 HTML 提取异常：仅 ${total} 条（期望 > 60）。`
-      + '上游可能改了 DOM 注入方式（不再用 innerHTML + 反引号模板），'
+    total > 5,
+    `JS 内嵌 HTML 提取异常：仅 ${total} 条（期望 > 5）。`
+      + '上游可能又改了 DOM 注入方式（2026-10-19 起原始字面量集中在 src/hud.js），'
       + '请检查 collectInlineHtmlStrings() 是否还能扫到文案，否则本门槛会假绿',
   );
 
-  // 自检 2：5 个已知的内嵌 HTML 模块必须都被扫到
-  const expectedFiles = [
-    'src/voice/control.js',
-    'src/hud.js',
-    'src/layers/launches/panel.js',
-    'src/layers/awareness/panel.js',
-    'src/data/bhoteKoshiEvent.js',
-  ];
+  // 自检 2：已知内嵌 HTML 模块必须被扫到（2026-10-19 迁移后仅剩 hud.js 仍用原始字面量）
+  const expectedFiles = ['src/hud.js'];
   const notScanned = expectedFiles.filter((f) => !byFile.has(f));
   assert.deepEqual(
     notScanned,
@@ -389,22 +392,17 @@ test('JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区）', ()
       + ' 请检查它们是否改了注入方式，并同步更新 collectInlineHtmlStrings()',
   );
 
-  // 自检 3：三层盲区各留一条正向对照（这些串必须在提取结果里）
+  // 自检 3：正向对照（这些串必须在提取结果里）
   const allItems = new Set(groups.flatMap((g) => g.items));
   const sentinels = [
-    // 直接 innerHTML 模板
-    ['src/voice/control.js', 'VOICE SYSTEM ERROR'],
-    // 变量间接赋值（const markup = `...` 再赋给 innerHTML）
-    ['src/layers/awareness/panel.js', 'Global Context navigation'],
-    // 插值三元字面量 ${cond ? 'A' : 'B'}
-    ['src/layers/awareness/panel.js', 'CONTEXT READY'],
-    ['src/layers/awareness/panel.js', 'GLOBAL CONTEXT OFF'],
+    // 直接 innerHTML 模板（hud.js 密级横幅）
+    ['src/hud.js', 'TOP SECRET // SI-TK // NOFORN'],
   ];
   for (const [file, text] of sentinels) {
     assert.ok(
       allItems.has(text),
       `采集器漏了已知文案 ${JSON.stringify(text)}（${file}）——`
-        + '某一层盲区的提取退化，门槛会假绿。请检查 collectInlineHtmlStrings()',
+        + '提取逻辑退化，门槛会假绿。请检查 collectInlineHtmlStrings()',
     );
   }
 
