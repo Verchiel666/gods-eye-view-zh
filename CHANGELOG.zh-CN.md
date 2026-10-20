@@ -2,6 +2,22 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-2.0.1 — 2026-10-20
+
+**同步上游 158 个提交**（82 个非合并提交，134 文件 +21315/-7940）并补齐新增文案翻译。上游本轮重点：**Gemini Live 语音提供方**（`src/voice` 32 文件，新增 `geminiSession.js`/`geminiAudio.js`/`providerCommands.js` 等）、**CCTV 摄像头目录强化**（Tarktee DATEX 编目加固、Kartverket 高程、FL511、后台增量刷新）、发射库请求对齐服务商指引、Agent World Packet 时效修复等。
+
+### 变更
+
+- `zh.json`：**+53 条新译**（Gemini Live 语音会话/音频/令牌错误、语音提供方切换、keySetup 太空任务令牌说明等），**-1 条陈旧**（"Higher space-missions request allowance"，上游已移除），目录 2623 → **2675 条**，`npm run i18n` 三语言 complete
+- 合并冲突 1 处：`scripts/package-boundaries.json`（上游 voice/sources 新模块条目 vs 本地 zh locale 条目），按**双方条目并集**解决，`check:boundaries` 实测通过
+
+### 验证
+
+- `npm run i18n`：zh / es / ru 三语言 **complete**（2675 条）
+- 汉化门槛 **28/28**；`check:boundaries` ✓；`format:check` ✓（1447 文件）；`npm run build` ✓（9.92s）
+- `npm test` **8279 / 8269 pass / 0 fail / 10 skip**（上游本轮新增约 475 个测试；原 win32 恒挂缺陷已随上游修复）
+- `package-lock.json` 无变动，未执行 `npm install`
+
 ## zh-2.0.0 — 2026-10-19
 
 **切换为上游原生中文语言包**。汉化机制从「DOM 注入补丁」升级为「一等公民 locale」：新增 `src/i18n/locales/zh.json`（**2623 条，覆盖上游全部 `t()`/`tn()`/`msg()` 与 `data-i18n*` 标记**，官方 `npm run i18n` 判定 `zh: 2623 messages, complete`），接入 `LOCALES` 与语言选择器（界面右下角地球按钮，中文名「中文」）。`same-as-english.json` 新增 zh 段 23 条（单位符号、波段、品牌、坐标、调色板名）。`zh.js` 补丁保留但重新分工：只补上游不标记的数据动态串与原生弹窗 hook；其语言门禁改为跟随上游解析顺序（`?lang=` → `gev:locale:v1` → 浏览器语言 → 默认 en），旧键 `gev-lang` 一次性迁移进 `gev:locale:v1`，原「中 / EN」注入按钮移除（由上游选择器接管）。
