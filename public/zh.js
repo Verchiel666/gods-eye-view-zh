@@ -868,7 +868,7 @@
     //       STREET LEVEL 面板，Mapillary 街景查看器 + 数据源/影像筛选）=====
     'STREET LEVEL': '街景',
     'Turn Street Level on or off': '开关街景',
-    'Expand the street-level view (Esc shrinks it)': '展开街景视图（Esc 键缩小）',
+    'Show the street-level view full screen (Esc shrinks it)': '全屏显示街景视图（按 Esc 缩小）',
     'EXPAND': '展开',
     'Image fit': '照片适配',
     'Fit: show the whole photo, with dark bars where its shape differs from the frame':

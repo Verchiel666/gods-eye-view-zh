@@ -2,6 +2,27 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-2.0.2 — 2026-10-22
+
+**同步上游 147 个提交**（97 个非合并提交，272 文件 +24379/-25144）并补齐新增文案翻译。上游本轮重点：**街景序列与覆盖重写**（`lineCoverage`/`sequenceCones` 新模块、provider 目录扁平化、segmented selectors 统一、hover/legend/byte-budget 缓存删除、改为等待 image cones/photo line 可拾取）、**浮动可缩放右侧面板整体移除**（`fbbc4cda`，`qa-panel-resize.mjs` 随之删除）、provider 响应格式校验（PR #1317）、共享 statusBadge/dropdown/numeric field 控件面等。
+
+### 变更
+
+- 合并冲突 3 处（自动化按策略中止后人工解决）：
+  - `scripts/package-boundaries.json`（与 zh-2.0.1 同一冲突点：上游 statusBadge / mapillary policy.js 条目 vs 本地 zh locale 条目）→ **双方条目并集**，`check:boundaries` 实测通过
+  - `scripts/qa-panel-resize.mjs`（modify/delete：被测功能本身已随面板重构移除）→ **接受删除**
+  - `scripts/qa-street-level.mjs`（上游整文件重写）→ **取上游版**，英文 pin 重贴到新 `boot()`；顺手把 pin 键从旧 `gev-lang` 升级为原生 **`gev:locale:v1`**（旧键仅靠 zh.js 的迁移逻辑兜底）
+- `zh.json`：**+9 条新译**（街景覆盖/序列/筛选/全屏按钮），**-13 条陈旧**（`--prune`：globe→ground 改写、面板缩放相关、`FOLLOW`/`Selected` 等被移除串），目录 2675 → **2671 条**，`npm run i18n` 三语言 complete
+- `public/zh.js` 词典 1 条换新：`Expand the street-level view (Esc shrinks it)` → `Show the street-level view full screen (Esc shrinks it)`（全屏显示街景视图（按 Esc 缩小）），与 zh.json 译法一致——该串在模板 `<button title>` 里，归补丁的静态门槛管
+- **修上游 win32 缺陷 1 处**：`skyAssets.paintOut.test.mjs`（本轮新引入）用 `URL.pathname` 拼资源路径，win32 下带前导斜杠（`/C:/...`）sharp 打不开 → 改 `fileURLToPath()`（与上游自己在 `0265ad4` 修 `codexOauthRealtime` 同款修法，可回馈）
+
+### 验证
+
+- `npm run i18n`：zh / es / ru 三语言 **complete**（2671 条）
+- 汉化门槛 **28/28**；`check:boundaries` ✓；`format:check` ✓（1471 文件）；`npm run build` ✓（18.71s）
+- `npm test` **8285 / 8275 pass / 0 fail / 10 skip**
+- `package-lock.json` 无变动，未执行 `npm install`
+
 ## zh-2.0.1 — 2026-10-20
 
 **同步上游 158 个提交**（82 个非合并提交，134 文件 +21315/-7940）并补齐新增文案翻译。上游本轮重点：**Gemini Live 语音提供方**（`src/voice` 32 文件，新增 `geminiSession.js`/`geminiAudio.js`/`providerCommands.js` 等）、**CCTV 摄像头目录强化**（Tarktee DATEX 编目加固、Kartverket 高程、FL511、后台增量刷新）、发射库请求对齐服务商指引、Agent World Packet 时效修复等。

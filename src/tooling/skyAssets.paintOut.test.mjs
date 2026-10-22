@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import sharp from 'sharp';
+import { fileURLToPath } from 'node:url';
 import {
   CUBE_FACES,
   FACE_FILE_SUFFIX,
@@ -23,8 +24,11 @@ test('painted-out planets leave no disc brighter than the sky around them', asyn
     ring: [],
   }));
   for (const face of CUBE_FACES) {
+    // zh fork: fileURLToPath, not .pathname — win32 keeps a leading slash in
+    // the pathname form (/C:/...) and sharp cannot open it (same class as the
+    // codexOauthRealtime win32 defect upstream fixed in 0265ad4).
     const { data, info } = await sharp(
-      new URL(`milkyway_${FACE_FILE_SUFFIX[face]}.webp`, SKY).pathname,
+      fileURLToPath(new URL(`milkyway_${FACE_FILE_SUFFIX[face]}.webp`, SKY)),
     )
       .raw()
       .toBuffer({ resolveWithObject: true });
