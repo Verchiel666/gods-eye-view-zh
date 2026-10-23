@@ -1,8 +1,14 @@
 /* God's Eye View 汉化补丁（运行时注入，不改核心源码）
- * 启用：index.html 引入本脚本；语言环境为中文时自动生效
- * （2026-10-19 起跟随上游原生 i18n 的解析：?lang= → gev:locale:v1 → 浏览器语言 → 默认 zh）
+ * 启用：index.html 引入本脚本；语言环境为简体中文（zh-CN）时自动生效
+ * （zh-3.0.0 起跟随上游原生 zh-CN locale 的解析：?lang= → gev:locale:v1 → 浏览器语言 → en）
  * 切换：界面右下角地球按钮（上游 locale 选择器，切换后自动刷新）
- * 分工：UI 文案由上游原生 zh.json 目录接管；本补丁只补数据动态串与弹窗 hook
+ * 分工：UI 文案由上游原生 zh-CN.json 目录接管；本补丁只补数据动态串与弹窗 hook
+ *
+ * zh-3.0.0 变更（上游原生收录简体中文，本地 zh.json 退役）：
+ *   - 门禁语言码 zh → zh-CN：与上游 normalizeLocale 完全同构——任何 zh 标签
+ *     映射到 zh-CN，繁体（Hant/TW/HK/MO）与上游一致保持英文、本补丁让位
+ *   - 旧键 gev-lang 迁移目标值 zh → zh-CN；存量 stored 'zh' 由映射自然吸收
+ *   - 本地 src/i18n/locales/zh.json 删除，术语口径以上游术语表为准
  *
  * zh-1.1.0 变更（同步上游 255 提交大重构后补充）：
  *   - 词典扩充至 ~330 条，覆盖 src/ui/ 组件化重构后的新面板
@@ -13,17 +19,30 @@
  */
 (function () {
   'use strict';
-  var LANG = 'zh';
-  // 语言门禁（2026-10-19 起跟随上游原生 i18n，解析顺序与 resolveLocale 一致）：
-  // ?lang= → localStorage['gev:locale:v1'] → 浏览器语言 → 默认 zh。
-  // 旧键 gev-lang 一次性迁移进新键后删除。解析结果非 zh 时补丁整体让位：
-  // 上游目录（es/ru/zh）已接管 UI 文案，本补丁只补数据动态串。
+  // 语言门禁（zh-3.0.0 起与上游 resolveLocale 同构）：
+  // ?lang= → localStorage['gev:locale:v1'] → 浏览器语言逐个 → 默认 en。
+  // 每个候选先归一化，第一个可归一化的生效；结果非 zh-CN 时补丁整体让位：
+  // 上游目录（es/ru/zh-CN）已接管 UI 文案，本补丁只补数据动态串。
   try {
+    // 与 src/i18n/locale.js normalizeLocale 同构（发货 locale 硬编码 en/es/ru/zh-CN）。
+    var normLocale = function (tag) {
+      if (typeof tag !== 'string') return null;
+      var parts = tag.trim().toLowerCase().split(/[-_]/);
+      if (parts[0] === 'zh') {
+        for (var i = 1; i < parts.length; i++) {
+          if (['hant', 'tw', 'hk', 'mo'].indexOf(parts[i]) >= 0) return null;
+        }
+        return 'zh-CN';
+      }
+      return parts[0] === 'en' || parts[0] === 'es' || parts[0] === 'ru'
+        ? parts[0]
+        : null;
+    };
     var legacy = localStorage.getItem('gev-lang');
     if (legacy) {
       try {
         if (!localStorage.getItem('gev:locale:v1')) {
-          localStorage.setItem('gev:locale:v1', legacy === 'en' ? 'en' : 'zh');
+          localStorage.setItem('gev:locale:v1', legacy === 'en' ? 'en' : 'zh-CN');
         }
         localStorage.removeItem('gev-lang');
       } catch (e2) {}
@@ -31,14 +50,24 @@
     var qm = /[?&]lang=([^&#]*)/.exec(
       (typeof location !== 'undefined' && location.search) || '',
     );
-    var ql = qm ? qm[1] : null;
     var stored = localStorage.getItem('gev:locale:v1');
     var navs =
       (typeof navigator !== 'undefined' &&
         (navigator.languages || [navigator.language])) ||
       [];
-    var eff = (ql || stored || navs[0] || 'en').toLowerCase().split(/[-_]/)[0];
-    if (eff !== 'zh') return;
+    var cands = [];
+    if (qm && qm[1]) cands.push(qm[1]);
+    if (stored) cands.push(stored);
+    for (var ni = 0; ni < navs.length; ni++) cands.push(navs[ni]);
+    var eff = null;
+    for (var ci = 0; ci < cands.length; ci++) {
+      var n = normLocale(cands[ci]);
+      if (n) {
+        eff = n;
+        break;
+      }
+    }
+    if (eff !== 'zh-CN') return;
   } catch (e) {
     return;
   }

@@ -51,7 +51,7 @@ function loadPatch() {
       alert: (m) => { dialogCalls.alert.push(m); },
       prompt: (m, d) => { dialogCalls.prompt.push([m, d]); return ''; },
     },
-    localStorage: { getItem: () => 'zh', setItem: () => {} },
+    localStorage: { getItem: (k) => (k === 'gev:locale:v1' ? 'zh-CN' : null), setItem: () => {} },
     document: {
       readyState: 'complete',
       title: '',

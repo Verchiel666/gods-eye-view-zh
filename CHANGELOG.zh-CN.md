@@ -2,6 +2,29 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-3.0.0 — 2026-10-23
+
+**同步上游 44 个提交**（25 个非合并提交，54 文件 +4084/-263）。上游本轮重点：**原生收录简体中文语言包**（社区 #914/#979 打底，i18n 负责人 German Khokhlov 逐条对照界面审校补全 910 条，随后六个 review/修复迭代：语言审校、两轮目录 review、readouts 本地化、FIRMS 年龄后缀去重、latest main 新串补译；配套 `docs/translations/zh-CN.md` 风格指南+术语表、`cjk.css` 中文排版、`zh-Hant/TW/HK/MO → en、其余 zh 标签 → zh-CN` 智能映射），另有地形高度请求限界、天气摄像头监听释放、分享恢复拒绝继承样式键、OpenSky 失败冷却、Docker trusted-peer 等修复。
+
+### 重大变更：本地 zh 目录退役，全面采用上游 zh-CN
+
+上游 zh-CN（**2677 条全量**，`npm run i18n` 判 complete）与本地 zh.json（2671 条）键集重合 99.96%，但译文完全一致的仅 1126 条——属独立翻译、风格不同而非错误。经对比（覆盖率/术语/全角标点/占位符四项实测）与维护成本权衡：**上游实现更完整且由 i18n 负责人持续维护**（normalizeLocale 智能映射、cjk.css、半球方位 context、术语表文档），继续自维护意味着每个同步周期人工补译。本 fork 保留价值转向：**zh.js 运行时补丁**（数据动态串/弹窗 hook/模板静态串，上游 `t()` 目录覆盖不到的三类）+ 汉化静态门槛 + QA/win32 修复。术语口径从本版起以上游术语表为准（如 NOT AN ALL-CLEAR 上游译「不代表安全无虞」，本地原译「并非解除警报」不再沿用）。
+
+- 合并冲突 5 处（自动化按策略中止后，老板授权贾维斯决策解决）：
+  - `src/i18n/locale.js` / `src/i18n/same-as-english.json` / `src/ui/localePicker.test.mjs` / `scripts/package-boundaries.json` → **取上游版**（boundaries 差异实测为纯 zh.json→zh-CN.json 改名，无分叉专属条目需保留）
+  - `src/i18n/index.js` → 取上游版但**补回 `tn()` 复数回退修复**（`pluralRules('en')`，上游未带，语义修正仍有效，可回馈）
+- `src/i18n/locales/zh.json` **删除**；`npm run i18n` 改为校验上游 zh-CN（es/ru/zh-CN 均 2677 条 complete）
+- `public/zh.js` 门禁重写：语言码 `zh` → **`zh-CN`**，与上游 `normalizeLocale` 完全同构（任一可归一化候选先生效；繁体 Hant/TW/HK/MO 与上游一致保持英文、补丁让位——旧逻辑会让繁体用户得到英文 UI + 中文补丁的混搭）；旧键 `gev-lang` 迁移目标值同步改 `zh-CN`；存量 stored `'zh'` 经映射自然吸收，用户无感
+- `src/tooling/zhLocalization.test.mjs` 存根语言码同步 `zh-CN`（28 例全绿）
+- 汉化门槛三道防假绿自检、`same-as-english.json` 等机制不变，继续由 zh.js 词典/RULES 兜底动态串
+
+### 验证
+
+- `npm run i18n`：es / ru / **zh-CN** 三语言 **complete**（2677 条）
+- 汉化门槛 **28/28**；`check:boundaries` ✓；`format:check` ✓（1472 文件）；`npm run build` ✓（55.74s）
+- `npm test` **8321 / 8310 pass / 0 fail / 11 skip**（独占资源干净复跑，TEST_EXIT=0；首轮与 format/boundaries 并行时 analystEngine 性能预算断言假红 1 例，单跑 56/56 绿、复跑 0 fail 证实为资源争抢抖动，非回归）
+- `package-lock.json` 无变动，未执行 `npm install`
+
 ## zh-2.0.2 — 2026-10-22
 
 **同步上游 147 个提交**（97 个非合并提交，272 文件 +24379/-25144）并补齐新增文案翻译。上游本轮重点：**街景序列与覆盖重写**（`lineCoverage`/`sequenceCones` 新模块、provider 目录扁平化、segmented selectors 统一、hover/legend/byte-budget 缓存删除、改为等待 image cones/photo line 可拾取）、**浮动可缩放右侧面板整体移除**（`fbbc4cda`，`qa-panel-resize.mjs` 随之删除）、provider 响应格式校验（PR #1317）、共享 statusBadge/dropdown/numeric field 控件面等。
