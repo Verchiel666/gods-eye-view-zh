@@ -4,33 +4,36 @@
 /** Durable preference key. Matches the repo convention gev:<name>:v1. */
 export const LOCALE_STORAGE_KEY = 'gev:locale:v1';
 
-/** Source language and fallback. Stays 'en' on the Chinese fork too:
- * Chinese users resolve to zh through navigator.languages (or the picker);
- * keeping the source language as fallback preserves upstream test semantics
- * (unit tests assert English UI text with no browser language present). */
+/** Source language and fallback. */
 export const DEFAULT_LOCALE = 'en';
 
 /** Shipped locales; order does not matter. Adding one: docs/TRANSLATORS.md. */
-export const LOCALES = Object.freeze(['en', 'es', 'ru', 'zh']);
+export const LOCALES = Object.freeze(['en', 'es', 'ru', 'zh-CN']);
 
 /** Each locale named in its own language, for the selector. */
 export const LOCALE_NAMES = Object.freeze({
   en: 'English',
   es: 'Español',
   ru: 'Русский',
-  zh: '中文',
+  'zh-CN': '简体中文',
 });
 
 /** Right-to-left locales. */
 const RTL_LOCALES = Object.freeze([]);
 
 /**
- * Map any language tag to a shipped locale: 'ru-RU' and 'RU' → 'ru'.
+ * Map any language tag to a shipped locale: 'ru-RU' and 'RU' → 'ru',
+ * 'zh', 'zh-CN' and 'zh-Hans-SG' → 'zh-CN'.
  * @returns {string|null}
  */
 export function normalizeLocale(candidate) {
   if (typeof candidate !== 'string') return null;
-  const primary = candidate.trim().toLowerCase().split(/[-_]/)[0];
+  const [primary, ...rest] = candidate.trim().toLowerCase().split(/[-_]/);
+  // Traditional Chinese readers are not given Simplified: no zh-TW yet.
+  if (primary === 'zh')
+    return rest.some((part) => ['hant', 'tw', 'hk', 'mo'].includes(part))
+      ? null
+      : 'zh-CN';
   return LOCALES.includes(primary) ? primary : null;
 }
 
