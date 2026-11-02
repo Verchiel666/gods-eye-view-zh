@@ -2,6 +2,21 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-3.0.1 — 2026-11-02
+
+**同步上游 52 个提交**（26 个非合并提交，97 文件 +4774/-5016）。上游本轮重点：**Authoring 场景创作面板**（#1472：场景/镜头两级编排，捕获-更新-播放-导入导出全流程）、绘制面积单位（#1446）、面板 chrome 一致性（#1466）、CCTV 视图抽稀（#1485）、GNSS 源窗口（#1491）、天气产品展示（#1494）、A22 布伦内罗摄像头（#956）、FIRMS IPv4 回退（#1078）等。
+
+### 变更
+
+- 无合并冲突；`package.json` / `package-lock.json` 未变，未执行 `npm install`
+- `public/zh.js` 词典 **+20 条**（911 → **931 条**）：authoring 面板静态串全量——AUTHORING / SCENE / NEW SCENE / DELETE / SHOTS / + CAPTURE SHOT / SAVE & SHARE / Scene（aria-label）+ 11 条 title 悬停提示 + 镜头操作提示句；**译文口径对齐上游 zh-CN.json**（场景/镜头术语与上游术语表一致，如 shot=镜头、scene=场景）
+- 碰撞检查：模板与 JS 中无其他独立 'scene'/'DELETE' 文案，大写回退无误伤面
+
+### 验证
+
+- 汉化门槛 **28/28**；`npm run i18n` 十语言 complete（各 2737 条）
+- 流程备注：08:57 自动化首跑抓出 20 条缺口、按预案回滚未推送；人工补词典后重新合并，两道门禁全绿后推送。全量 `npm test` / `build` / `check:boundaries` 按惯例由人工择机进行
+
 ## zh-3.0.0 — 2026-10-23
 
 **同步上游 44 个提交**（25 个非合并提交，54 文件 +4084/-263）。上游本轮重点：**原生收录简体中文语言包**（社区 #914/#979 打底，i18n 负责人 German Khokhlov 逐条对照界面审校补全 910 条，随后六个 review/修复迭代：语言审校、两轮目录 review、readouts 本地化、FIRMS 年龄后缀去重、latest main 新串补译；配套 `docs/translations/zh-CN.md` 风格指南+术语表、`cjk.css` 中文排版、`zh-Hant/TW/HK/MO → en、其余 zh 标签 → zh-CN` 智能映射），另有地形高度请求限界、天气摄像头监听释放、分享恢复拒绝继承样式键、OpenSky 失败冷却、Docker trusted-peer 等修复。
