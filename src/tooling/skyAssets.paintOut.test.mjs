@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { fileURLToPath } from 'node:url';
 import {
   CUBE_FACES,
   FACE_FILE_SUFFIX,
