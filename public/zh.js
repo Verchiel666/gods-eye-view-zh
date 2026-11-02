@@ -1379,7 +1379,29 @@
     'Unsupported cloud voice auth mode': '不支持的云端语音认证方式',
     'GEV_PREFER_CODEX_OAUTH must be true or false. Refusing to choose a voice auth mode.':
       'GEV_PREFER_CODEX_OAUTH 必须是 true 或 false。拒绝自行选择语音认证方式。',
-    'Invalid login process': '登录流程无效'
+    'Invalid login process': '登录流程无效',
+
+    // ===== Authoring 场景创作面板（上游 #1472，2026-11-02 补；译文口径对齐上游 zh-CN.json） =====
+    'AUTHORING': '创作',
+    'SCENE': '场景',
+    'NEW SCENE': '新建场景',
+    'DELETE': '删除',
+    'SHOTS': '镜头',
+    '+ CAPTURE SHOT': '+ 保存镜头',
+    'SAVE & SHARE': '保存与分享',
+    'Scene': '场景',
+    'Create and edit scenes': '创建和编辑场景',
+    'Start a new, empty scene': '新建一个空场景',
+    'Delete this scene and all of its shots': '删除此场景及其所有镜头',
+    'Add the current view, style and layers as the next shot': '将当前视角、样式和图层添加为下一个镜头',
+    'Replace the selected shot with the current view': '用当前视角替换所选镜头',
+    'Play from this scene through the rest of the project': '从此场景开始播放项目中的其余场景',
+    'Stop playback (Esc)': '停止播放（Esc）',
+    'Play the shot after the selected one, moving on to the next scene when needed': '播放所选镜头的下一个镜头，必要时进入下一个场景',
+    'Download every scene as a JSON file you can import later': '将所有场景下载为 JSON 文件，以便日后导入',
+    'Load scenes from an exported JSON file': '从导出的 JSON 文件加载场景',
+    'Download the timing log of the last play': '下载上次播放的计时日志',
+    'Click a shot to select it, double-click to rename.': '单击镜头即可选中，双击可重命名。'
   };
 
   /* 中文前缀 + 译文拼接：译文以中文开头时不补空格（否则是「正在切换到 调频」）。
