@@ -4,7 +4,6 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { expandApplicationHtml } from '../../build/application-html.js';
 
 /**
  * 汉化补丁（public/zh.js）回归测试。
@@ -20,13 +19,17 @@ import { expandApplicationHtml } from '../../build/application-html.js';
  *
  * 同步上游后若本测试变红，说明上游改了文案，需补 public/zh.js 词典。
  *
- * ⚠ 「静态文案」的来源（2026-09-15 上游重构后）：
- * 上游已把 index.html 瘦成壳（约 40 行），真实标记拆进 src/ui/templates/*.html，
- * 由 build/application-html.js 的 expandApplicationHtml() 在 Vite
- * transformIndexHtml 阶段展开 `<!-- gev:template X -->` 占位符。
- * 本测试因此直接复用上游那个展开函数（与 src/*.test.mjs 同款相对路径写法），
- * 测的才是浏览器真正渲染出来的标记——上游再加模板会自动纳入门槛，
- * 不会因「index.html 里找不到文案」而假绿。
+ * ⚠ 「静态文案」的来源（2026-11-03 上游 Vue 化后，第二次重写）：
+ * 上游已把 UI 整体迁移到 Vue SFC（src/ui/**\/*.vue，挂载进 index.html 的
+ * `<div data-gev-view="X">` 宿主），旧 src/ui/templates/*.html 与
+ * build/application-html.js 均已删除。模板里的可见文案已全面 t() 化
+ * （`{{ t('...') }}` / `:title="t('...')"`），归上游原生 i18n 与 `npm run i18n`
+ * 门槛管辖；本采集器只扫**未包 t() 的原始字面量残留**（index.html 的
+ * loading 屏 + .vue `<template>` 块里的静态文本/静态属性）。
+ * 实测残留仅 13 条，几乎全是刻意不译的品牌名/技术缩写（白名单豁免）；
+ * 真正需要词典兜底的极少（如 `Initializing photorealistic world...`）。
+ * 价值：上游新增模板若漏标 t()，残留串会立刻被本门槛抓住，不会静默退回英文。
+ * 历史：2026-09-15 第一版复用 expandApplicationHtml() 展开 gev:template 占位符。
  */
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -152,48 +155,95 @@ function isTranslatable(raw) {
 }
 
 /**
- * 提取浏览器实际渲染出来的可翻译静态文案。
+ * 提取浏览器实际渲染出来的可翻译静态文案（Vue SFC 版）。
  *
- * 上游已把 index.html 瘦成壳，真实标记在 src/ui/templates/*.html，
- * 由 expandApplicationHtml() 在构建期展开 `<!-- gev:template X -->` 占位符。
- * 这里复用同一个函数，确保测的是运行时标记，而不是壳。
+ * 来源 = index.html + src/ui/**\/*.vue 的 `<template>` 块。
+ * 只抓**原始字面量残留**，三种 Vue 形态必须剔除：
+ *   1. `{{ ... }}` 插值（含 t() 串）——整体抹掉，归上游 i18n 门槛管；
+ *   2. `:title="..."` 等动态绑定——属性正则用 (?<!:) 排除，只抓静态属性；
+ *   3. script/style/注释（不参与渲染）。
+ * 另须剔除 Material Symbols 图标连字（<span class="... material-symbols-outlined">draw</span>）：
+ * 那是字体连字码点，译了就渲染成方框，绝不能进词典/门槛。
  *
- * 两个必须剔除的假阳性：
- *   - script/style/注释（不参与渲染）
- *   - Material Symbols 图标连字（<span class="... material-symbols-outlined">draw</span>）：
- *     那是字体连字码点，译了就渲染成方框，绝不能进词典/门槛
+ * 返回 { groups, scannedFiles }：scannedFiles 供防假绿自检断言
+ * 「采集器确实扫到了已知文件」，避免目录结构变化导致扫不到文件而假绿。
  */
 function collectHtmlStrings() {
-  const expanded = expandApplicationHtml(readFileSync(HTML_PATH, 'utf8'));
-  const html = expanded
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    // 先整体抹掉图标 span（含其文本连字），再提文案
-    .replace(/<span[^>]*material-symbols-outlined[^>]*>[\s\S]*?<\/span>/gi, '');
+  const vueFiles = [];
+  (function walk(dir) {
+    for (const entry of readdirSync(dir)) {
+      const full = path.join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (entry.endsWith('.vue')) vueFiles.push(full);
+    }
+  })(path.join(REPO_ROOT, 'src'));
+
+  const sources = [
+    { file: 'index.html', html: readFileSync(HTML_PATH, 'utf8') },
+    ...vueFiles.map((f) => {
+      const source = readFileSync(f, 'utf8');
+      const m = source.match(/<template>([\s\S]*?)<\/template>/);
+      return {
+        file: path.relative(REPO_ROOT, f).split(path.sep).join('/'),
+        html: m ? m[1] : '',
+      };
+    }),
+  ];
 
   const groups = [
-    { name: 'title', re: /\btitle\s*=\s*"([^"]+)"/g },
+    // (?<!:) 排除 Vue 动态绑定 :title= / :placeholder= / :aria-label=
+    { name: 'title', re: /(?<!:)\btitle\s*=\s*"([^"]+)"/g },
     { name: 'text', re: />([^<>{}]+)</g },
-    { name: 'placeholder', re: /\bplaceholder\s*=\s*"([^"]+)"/g },
-    { name: 'aria-label', re: /\baria-label\s*=\s*"([^"]+)"/g },
+    { name: 'placeholder', re: /(?<!:)\bplaceholder\s*=\s*"([^"]+)"/g },
+    { name: 'aria-label', re: /(?<!:)\baria-label\s*=\s*"([^"]+)"/g },
   ];
 
   const out = [];
   const seen = new Set();
-  for (const { name, re } of groups) {
-    const items = new Set();
-    for (const m of html.matchAll(re)) {
-      const t = decodeEntities(m[1]).replace(/\s+/g, ' ').trim();
-      if (isTranslatable(t) && !seen.has(t)) {
-        seen.add(t);
-        items.add(t);
+  const scannedFiles = [];
+  for (const { file, html: raw } of sources) {
+    const html = raw
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      // 先整体抹掉图标 span（含其文本连字），再提文案
+      .replace(/<span[^>]*material-symbols-outlined[^>]*>[\s\S]*?<\/span>/gi, '')
+      // Vue 插值整体抹掉（t() 串归上游 i18n 门槛管）
+      .replace(/\{\{[\s\S]*?\}\}/g, '');
+    scannedFiles.push(file);
+
+    for (const { name, re } of groups) {
+      let bucket = out.find((g) => g.name === name);
+      if (!bucket) {
+        bucket = { name, items: [] };
+        out.push(bucket);
       }
+      const items = new Set(bucket.items);
+      for (const m of html.matchAll(re)) {
+        const t = decodeEntities(m[1]).replace(/\s+/g, ' ').trim();
+        if (isTranslatable(t) && !seen.has(t)) {
+          seen.add(t);
+          items.add(t);
+        }
+      }
+      bucket.items = [...items];
     }
-    out.push({ name, items: [...items] });
   }
-  return out;
+  return { groups: out, scannedFiles };
 }
+
+/**
+ * 静态残留里的「刻意不译」白名单（2026-11-03 实测 13 条残留的分类）。
+ * 品牌名 / 数据源名 / 技术缩写：只豁免下方的覆盖断言（这些串不需要词典兜底）。
+ * 注意不做「必须不译」反向断言——实测其中 GOD'S EYE→上帝之眼、FM→调频、
+ * HUD→抬头显示等词条是**其他 DOM 上下文**（图层名/选项标签）的合理翻译；
+ * 品牌上下文由上游 translate="no" 与 DOM 层负责，不归词典门槛管。
+ */
+const STATIC_KEEP_VERBATIM = new Set([
+  "GOD'S EYE", 'God\'s Eye View', 'VIEW', // translate="no" 品牌
+  'AIS', 'AISStream', 'OpenSky', 'OpenStreetMap', 'OPEN-METEO', // 数据源名
+  'FM', 'IQ', 'HUD', 'ADS-B · 1090', // 技术缩写 / 设备读数
+]);
 
 /**
  * 采集 JS 源码里内嵌 HTML 模板中的可见文案。
@@ -311,102 +361,90 @@ test('词典无重复键（重复会让后者静默覆盖前者）', () => {
   assert.deepEqual(duplicates, [], `词典存在重复键：${duplicates.join(', ')}`);
 });
 
-test('静态文案 100% 覆盖（同步上游后的覆盖率门槛）', () => {
+test('静态文案 100% 覆盖（同步上游后的覆盖率门槛，Vue SFC 版）', () => {
   const { lookup } = loadPatch();
+  const { groups, scannedFiles } = collectHtmlStrings();
   const missing = [];
   let total = 0;
   const all = new Set();
 
-  for (const group of collectHtmlStrings()) {
-    total += group.items.length;
+  for (const group of groups) {
     for (const text of group.items) {
       all.add(text);
+      if (STATIC_KEEP_VERBATIM.has(text)) continue; // 白名单：刻意不译
+      total += 1;
       if (lookup(text) === null) missing.push(`[${group.name}] ${JSON.stringify(text)}`);
     }
   }
 
+  // 防假绿自检 1：采集器必须真扫到文件（目录扫描退化 → 0 条 → 假绿）。
   assert.ok(
-    total > 300,
-    `静态文案提取异常：仅 ${total} 条。`
-      + '上游可能又改了标记来源（index.html 现为壳，真实文案在 src/ui/templates/*.html，'
-      + '经 build/application-html.js 的 expandApplicationHtml 展开），请同步更新 collectHtmlStrings()',
+    scannedFiles.length >= 50,
+    `静态采集器扫描文件数异常：仅 ${scannedFiles.length} 个（期望 >= 50：index.html + 76 个 .vue）。`
+      + '上游可能又改了 UI 载体，请同步更新 collectHtmlStrings()',
   );
-  // 过滤规则自身的防回归：句号结尾的整句必须仍在提取范围内。
-  // 旧版 isTranslatable 用 /[._]/ 一刀切排除，把这类句子连带误杀过（门槛假绿）。
+  // 防假绿自检 2：已知文件必须被扫到。
+  for (const known of ['index.html', 'src/ui/views/SceneChromeView.vue']) {
+    assert.ok(
+      scannedFiles.includes(known),
+      `静态采集器没扫到 ${known}（采集器退化 → 门槛会假绿）`,
+    );
+  }
+  // 防假绿自检 3：哨兵串必须在提取结果里。
+  // index.html loading 屏的 `Initializing photorealistic world...` 是带
+  // data-i18n 的原始字面量：上游 i18n 若缺译/失效，zh.js 词典兜底。
+  // 同时它验证「句号结尾的整句仍在提取范围内」（isTranslatable 点号排除不得过宽）。
   assert.ok(
-    all.has('Connect an RTL-SDR to begin.'),
-    'collectHtmlStrings 又把句号结尾的整句过滤掉了（isTranslatable 的点号排除过宽），门槛会假绿',
+    all.has('Initializing photorealistic world...'),
+    'collectHtmlStrings 漏了 index.html loading 屏哨兵串（提取逻辑退化，门槛会假绿）',
   );
   assert.deepEqual(
     missing,
     [],
-    `有 ${missing.length}/${total} 条静态文案未汉化（上游可能改了文案，需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
+    `有 ${missing.length}/${total} 条静态残留文案未汉化（上游模板可能漏标 t()，需补 public/zh.js 词典兜底并回馈上游）：\n  ${missing.join('\n  ')}`,
   );
 });
 
 /**
  * JS 内嵌 HTML 门槛：补齐静态门槛扫不到的第二片盲区。
  *
- * 存在理由见 collectInlineHtmlStrings() 的注释。语音卡片、HUD、太空任务面板、
- * 军事情报面板、洪水事件面板全部走 innerHTML，静态门槛一条也扫不到。
+ * 存在理由见 collectInlineHtmlStrings() 的注释。
  *
- * ⚠ 2026-10-19 结构性校准（上游 267 提交合并）：
- * 上游引入原生 i18n 设施（src/i18n/，t()/tn()/msg() 标记 + es/ru 目录），把语音卡片、
- * 太空任务面板、军事情报面板、洪水事件面板模板里的原始字面量全部包进 t() 调用，
- * 例如 `>${t('AI AGENT')}<`。t() 在无 zh 目录时返回英文，DOM 仍是英文 → 运行时补丁照常
- * 翻译（26 道动态串测试全绿可证）。但本采集器只认模板里的原始字面量，提取量从 101 条
- * 降到 11 条（全部在 src/hud.js，且全部已译）。自检相应改为以 hud.js 为唯一已知模块；
- * 三层提取逻辑保留，防上游回退或新增模块再走原始 innerHTML。
- * t() 标记串本身的覆盖核查是另一片更大的战场（2315 条标记、含 {placeholder} 插值，
- * 字面 lookup 不可行，需占位符感知的探针），不在本门槛职责内。
+ * ⚠ 2026-11-03 第二次结构性校准（上游 Vue 化）：
+ * 上游把 UI 迁移到 Vue SFC 后，JS 内嵌 HTML 反引号模板里的原始字面量
+ * 实测已降至 **0 条**（含 innerHTML 的模块仅剩 globePanelRuntime.js 与
+ * bhoteKoshiEmbeddedMedia.js，模板文案均已 t() 化或无可见文本）。
+ * hud.js 也不再走 innerHTML（改为 view 对象 + IntelHudView.vue 渲染，
+ * TOP SECRET 密级横幅是数据字段，上游标注 i18n-ignore，词典词条仍兜底）。
+ * 因此本门槛的定位从「清欠」转为「防回退」：三层提取逻辑全部保留，
+ * 一旦上游回退或新增模块再走原始 innerHTML 字面量，覆盖断言立刻报红。
+ * t() 标记串本身的覆盖核查由 `npm run i18n` 负责，不在本门槛职责内。
  *
- * 防假绿的三道自检（吸取 2026-09-28「门槛自身失效」与 2026-09-29「虚构断言」两次教训）：
- *   1. 提取条数下限：内嵌文案总量必须 > 5 条（2026-10-19 前为 > 60，迁移后全量仅 11 条）。
- *      若 hud.js 也改注入方式，提取数会骤降 → 下限触发，提示同步更新采集器。
- *   2. 采集器必须真扫到已知模块：写死文件名断言，防止「扫不到任何文件
- *      → 循环体一次都没进 → missing 恒为空 → 门槛假绿」。
- *   3. 留一条已知文案做正向对照（hud.js 的密级横幅）。采集器退化时断言会精确报红，
- *      而不是让整道门槛静默变绿。
+ * 防假绿自检（0 条属预期，不能再拿条数下限当信号）：
+ *   - 结构性断言：采集器扫描的 src 下 .js 文件数必须足够（证明扫描没退化）。
+ *   - 若扫到文案，则必须 100% 词典覆盖（同旧语义）。
  */
-test('JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区）', () => {
+test('JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区，防回退）', () => {
   const { lookup } = loadPatch();
   const groups = collectInlineHtmlStrings();
-  const byFile = new Map(groups.map((g) => [g.file, g.items]));
-
-  // 自检 1：提取条数下限
   const total = groups.reduce((sum, g) => sum + g.items.length, 0);
+
+  // 结构自检：src 下非测试 .js 文件数必须远超两位数（2026-11-03 实测约 900），
+  // 若目录扫描退化（路径写错/权限问题），这个断言会先红，而不是让 0 条假绿。
+  let jsFileCount = 0;
+  (function walk(dir) {
+    for (const entry of readdirSync(dir)) {
+      const full = path.join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.js$/.test(entry) && !/\.test\.m?js$/.test(entry)) jsFileCount += 1;
+    }
+  })(path.join(REPO_ROOT, 'src'));
   assert.ok(
-    total > 5,
-    `JS 内嵌 HTML 提取异常：仅 ${total} 条（期望 > 5）。`
-      + '上游可能又改了 DOM 注入方式（2026-10-19 起原始字面量集中在 src/hud.js），'
-      + '请检查 collectInlineHtmlStrings() 是否还能扫到文案，否则本门槛会假绿',
+    jsFileCount >= 100,
+    `src 下 .js 文件扫描数异常：仅 ${jsFileCount}（期望 >= 100），采集器目录扫描可能退化`,
   );
 
-  // 自检 2：已知内嵌 HTML 模块必须被扫到（2026-10-19 迁移后仅剩 hud.js 仍用原始字面量）
-  const expectedFiles = ['src/hud.js'];
-  const notScanned = expectedFiles.filter((f) => !byFile.has(f));
-  assert.deepEqual(
-    notScanned,
-    [],
-    `以下已知内嵌 HTML 模块没被采集器扫到（采集器退化 → 门槛会假绿）：${notScanned.join(', ')}。`
-      + ' 请检查它们是否改了注入方式，并同步更新 collectInlineHtmlStrings()',
-  );
-
-  // 自检 3：正向对照（这些串必须在提取结果里）
-  const allItems = new Set(groups.flatMap((g) => g.items));
-  const sentinels = [
-    // 直接 innerHTML 模板（hud.js 密级横幅）
-    ['src/hud.js', 'TOP SECRET // SI-TK // NOFORN'],
-  ];
-  for (const [file, text] of sentinels) {
-    assert.ok(
-      allItems.has(text),
-      `采集器漏了已知文案 ${JSON.stringify(text)}（${file}）——`
-        + '提取逻辑退化，门槛会假绿。请检查 collectInlineHtmlStrings()',
-    );
-  }
-
-  // 正式覆盖断言
+  // 覆盖断言：0 条属预期（上游 i18n 化完成）；一旦有新原始字面量，必须词典覆盖。
   const missing = [];
   for (const { file, items } of groups) {
     for (const text of items) {
@@ -416,7 +454,7 @@ test('JS 内嵌 HTML 文案 100% 覆盖（静态门槛的第二片盲区）', ()
   assert.deepEqual(
     missing,
     [],
-    `有 ${missing.length}/${total} 条 JS 内嵌 HTML 文案未汉化（需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
+    `有 ${missing.length}/${total} 条 JS 内嵌 HTML 文案未汉化（上游回退或新增模块走了原始 innerHTML，需补 public/zh.js）：\n  ${missing.join('\n  ')}`,
   );
 });
 

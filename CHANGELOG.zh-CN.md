@@ -2,6 +2,30 @@
 
 本文件记录中文汉化 fork 相对上游的变更。上游变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
+## zh-3.1.0 — 2026-11-03
+
+**同步上游 338 个提交**（1047 文件 +67968/-20346）。上游本轮是架构级改造：**UI 从「HTML 模板展开」整体迁移到 Vue SFC 构建链**——76 个 `.vue` 组件（views/kit/rail/layerPanel 等），新增 `build/registerVue.js`（Node `registerHooks` 加载 SFC）/ `build/vueLoader.js` / `build/vueOptions.js`，删除 `build/application-html.js` 与 `src/ui/templates/*.html`；index.html 改为 `<div data-gev-view="X">` 挂载点 + `mountApplicationViews()`（Pinia + 应用级 i18n）。模板可见文案已全面 `t()` 化，归上游原生 i18n 管辖。
+
+### 重大变更：汉化门槛第二次重写（适配 Vue SFC）
+
+自动化首跑时门槛直接 `ERR_MODULE_NOT_FOUND`（旧门槛 import 被删的 `build/application-html.js`），按预案回滚；老板授权后重写再合并：
+
+- `collectHtmlStrings()` 重写：采集源改为 **index.html + 全部 `.vue` 的 `<template>` 块**；剔除 `{{ }}` 插值（t() 串归 `npm run i18n` 管）、`:attr=` 动态绑定（`(?<!:)` 断言只抓静态属性）。实测原始字面量残留仅 **13 条**：12 条为刻意不译的品牌名/数据源名/技术缩写（白名单豁免覆盖断言），真正需词典兜底的仅 index.html loading 屏 `Initializing photorealistic world...`（词典既有词条，兜底有效）。价值转为「抓上游漏标 t() 的新模板串」
+- 防假绿自检重校准：扫描文件数下限（≥50）、已知文件必扫到（index.html / SceneChromeView.vue）、哨兵串改为 loading 屏那条；删除「白名单必须不译」的过度断言（实测 GOD'S EYE→上帝之眼、FM→调频 等是其他 DOM 上下文的合理词条）
+- JS 内嵌 HTML 门槛：实测原始字面量 **0 条**（含 innerHTML 的仅剩 globePanelRuntime.js / bhoteKoshiEmbeddedMedia.js，文案均已 t() 化；hud.js 改走 view 对象 + IntelHudView.vue），三道旧自检（>5 条 / hud.js 必扫到 / TOP SECRET 哨兵）全部失效，改为**防回退语义**——三层提取逻辑保留，扫到新原始字面量必须 100% 词典覆盖；结构自检改为 src 下 .js 文件扫描数下限
+
+### 其他
+
+- `public/zh.js` **未动**（词典仍 931 条，26 例动态串测试在新代码上全绿，规则与 DOM 文本形态兼容）
+- `src/i18n/index.js` 唯一分叉行 `pluralRules('en')` 合并后保留；index.html 的 `<script src="/zh.js">` 注入点保留
+- `package.json` / `package-lock.json` 均变，已 `npm install`（+54 包）
+- 4 个分叉保留文件上游均未触碰，合并无冲突
+
+### 验证
+
+- 汉化门槛 **28/28**；`npm run i18n` 11 语言 complete（各 2735 条，含 zh-CN / zh-Hant）
+- 流程备注：09:06 自动化首跑门禁结构性失败、按预案回滚未推送；随后重写门槛再合并，两道门禁全绿后推送。全量 `npm test` / `build` / `check:boundaries` 按惯例由人工择机进行（Vue 构建链改动大，建议尽早跑一次 build）
+
 ## zh-3.0.1 — 2026-11-02
 
 **同步上游 52 个提交**（26 个非合并提交，97 文件 +4774/-5016）。上游本轮重点：**Authoring 场景创作面板**（#1472：场景/镜头两级编排，捕获-更新-播放-导入导出全流程）、绘制面积单位（#1446）、面板 chrome 一致性（#1466）、CCTV 视图抽稀（#1485）、GNSS 源窗口（#1491）、天气产品展示（#1494）、A22 布伦内罗摄像头（#956）、FIRMS IPv4 回退（#1078）等。
