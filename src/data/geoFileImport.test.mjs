@@ -1205,7 +1205,9 @@ test('repeated incomplete KML roots finish within an isolated process deadline',
   const child = spawnSync(
     process.execPath,
     ['--input-type=module', '-e', source],
-    { timeout: 5000, encoding: 'utf8' },
+    // Windows process startup under the parallel unit suite can exceed five
+    // seconds; retain a bounded deadline without relaxing the POSIX budget.
+    { timeout: process.platform === 'win32' ? 15000 : 5000, encoding: 'utf8' },
   );
   assert.ifError(child.error);
   assert.equal(child.status, 0, child.stderr);

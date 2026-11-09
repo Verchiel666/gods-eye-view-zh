@@ -684,11 +684,14 @@ test('the disk cache survives a restart and stays within its bounds', async () =
     await createNominatimCache({ dir, now: time.now }).get('k0'),
     null,
   );
-  assert.equal(
-    fs.statSync(dir).mode & 0o777,
-    0o700,
-    'the query cache directory is private',
-  );
+  // Node synthesizes POSIX mode bits on Windows: chmod(0o700/0o600) still
+  // reports 0o666, while access is controlled by the user's ACL instead.
+  if (process.platform !== 'win32')
+    assert.equal(
+      fs.statSync(dir).mode & 0o777,
+      0o700,
+      'the query cache directory is private',
+    );
   const text = fs
     .readdirSync(dir)
     .filter((name) => name.endsWith('.json'))
@@ -698,11 +701,12 @@ test('the disk cache survives a restart and stays within its bounds', async () =
   for (const name of fs
     .readdirSync(dir)
     .filter((entry) => entry.endsWith('.json')))
-    assert.equal(
-      fs.statSync(path.join(dir, name)).mode & 0o777,
-      0o600,
-      `${name} is private`,
-    );
+    if (process.platform !== 'win32')
+      assert.equal(
+        fs.statSync(path.join(dir, name)).mode & 0o777,
+        0o600,
+        `${name} is private`,
+      );
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
